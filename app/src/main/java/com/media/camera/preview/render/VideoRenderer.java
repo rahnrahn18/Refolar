@@ -38,6 +38,9 @@ public abstract class VideoRenderer {
 
     protected native int getParameters();
 
+    protected native void setPortraitMode(boolean enabled);
+    protected native void setBlurStrength(float strength);
+
     public abstract void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror);
 
     public void destroyRenderer() {

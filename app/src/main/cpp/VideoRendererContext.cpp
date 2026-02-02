@@ -30,6 +30,14 @@ uint32_t VideoRendererContext::getParameters() {
     return m_pVideoRenderer->getParameters();
 }
 
+void VideoRendererContext::setPortraitMode(bool enable) {
+    m_pVideoRenderer->setPortraitMode(enable);
+}
+
+void VideoRendererContext::setBlurStrength(float strength) {
+    m_pVideoRenderer->setBlurStrength(strength);
+}
+
 void VideoRendererContext::createContext(JNIEnv *env, jobject obj, jint type) {
     auto *context = new VideoRendererContext(type);
 

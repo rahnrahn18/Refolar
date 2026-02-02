@@ -25,6 +25,17 @@ public:
 
     int createProgram(const char *pVertexSource, const char *pFragmentSource) override;
 
+    void setPortraitMode(bool enable) override {
+        if (m_isPortrait != enable) {
+            m_isPortrait = enable;
+            isDirty = true;
+        }
+    }
+
+    void setBlurStrength(float strength) override {
+        m_blurStrength = strength;
+    }
+
 private:
     enum TextureType {
         tTexY, tTexU, tTexV
@@ -38,9 +49,15 @@ private:
     struct UniformBufferObject {
         float rotation[16];
         float scale[16];
+        float blurStrength;
+        int isPortrait;
+        float padding[2];
     };
 
     UniformBufferObject m_ubo{};
+
+    bool m_isPortrait = false;
+    float m_blurStrength = 5.0f;
 
     struct VulkanTexture {
         VkSampler sampler;
@@ -101,6 +118,7 @@ private:
         VkPipeline pipeline;
     };
     VulkanGfxPipelineInfo m_gfxPipeline{};
+    VulkanGfxPipelineInfo m_gfxPipelineBokeh{};
 
     struct VulkanBufferInfo {
         VkBuffer vertexBuffer;
@@ -132,7 +150,7 @@ private:
 
     void createDescriptorSet();
 
-    VkResult createGraphicsPipeline();
+    VkResult createGraphicsPipeline(VulkanGfxPipelineInfo *pipelineInfo, const char *vertShader, const char *fragShader);
 
     void createFrameBuffers(VkImageView depthView = VK_NULL_HANDLE);
 

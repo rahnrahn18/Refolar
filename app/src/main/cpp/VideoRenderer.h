@@ -38,6 +38,9 @@ public:
 
     virtual uint32_t getParameters() = 0;
 
+    virtual void setPortraitMode(bool enable) {};
+    virtual void setBlurStrength(float strength) {};
+
     virtual int createProgram(const char *pVertexSource, const char *pFragmentSource) = 0;
 
 protected:
