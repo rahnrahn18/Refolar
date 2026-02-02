@@ -211,24 +211,11 @@ public class AIDepthProcessor {
     }
 
     private void runMockInference() {
+        // Fallback: Return a completely white mask (Subject) to avoid static vignette artifacts.
+        // If inference fails, it's better to have no blur than a misleading one.
         byte[] depthMap = new byte[inputSize * inputSize];
-        float centerX = inputSize / 2.0f;
-        float centerY = inputSize / 2.0f;
-        float maxRadius = inputSize / 3.0f;
-
-        for (int y = 0; y < inputSize; y++) {
-            for (int x = 0; x < inputSize; x++) {
-                float dx = x - centerX;
-                float dy = y - centerY;
-                float dist = (float)Math.sqrt(dx*dx + dy*dy);
-
-                // 1.0 (255) = Sharp (Subject), 0.0 (0) = Blur (BG)
-                if (dist < maxRadius) {
-                    depthMap[y * inputSize + x] = (byte)255;
-                } else {
-                    depthMap[y * inputSize + x] = (byte)0;
-                }
-            }
+        for (int i = 0; i < inputSize * inputSize; i++) {
+            depthMap[i] = (byte) 255; // All Sharp
         }
         if (callback != null) {
             callback.onDepthMapReady(depthMap, inputSize, inputSize);
