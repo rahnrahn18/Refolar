@@ -160,10 +160,14 @@ public class VKActivity extends BaseActivity implements ActivityCompat.OnRequest
             mCameraController.getStorageController().openGallery();
         });
 
-        // Settings (Resolution) Logic
-        btnSettings.setOnClickListener(v -> {
-            showResolutionDialog(mCameraController.getOutputSizes());
-        });
+        // Settings (Resolution) Logic - Mapped to first expanded item if needed,
+        // or effectively removed for now as btnSettings was removed.
+        // If we want to keep it accessible:
+        if (settingsExpanded.getChildCount() > 0) {
+            settingsExpanded.getChildAt(0).setOnClickListener(v -> {
+                showResolutionDialog(mCameraController.getOutputSizes());
+            });
+        }
     }
 
     @Override
