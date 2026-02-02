@@ -32,6 +32,7 @@ public:
     void setFilter(int filterId);
     void updateDepthData(uint8_t *data, size_t width, size_t height);
     void setQualityParams(int samples);
+    void captureNextFrame(JNIEnv *env, jobject callback);
 
     static void createContext(JNIEnv *env, jobject obj, jint type);
 

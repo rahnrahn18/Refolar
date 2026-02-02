@@ -87,3 +87,9 @@ JCMCPRV(void, setQualityParams)(JNIEnv *env, jobject obj, jint samples) {
 
     if (context) context->setQualityParams(samples);
 }
+
+JCMCPRV(void, captureNextFrame)(JNIEnv *env, jobject obj, jobject callback) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->captureNextFrame(env, callback);
+}

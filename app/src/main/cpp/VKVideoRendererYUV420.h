@@ -31,6 +31,7 @@ public:
     void setFilter(int filterId) override;
     void updateDepthData(uint8_t *data, size_t width, size_t height) override;
     void setQualityParams(int samples) override;
+    void captureNextFrame(std::function<void(uint8_t*, int, int)> callback) override;
 
 private:
     enum TextureType {
@@ -119,6 +120,11 @@ private:
         VkDeviceMemory uboBufferMemory;
     };
     VulkanBufferInfo m_buffers{};
+
+    bool m_captureRequest = false;
+    std::function<void(uint8_t*, int, int)> m_captureCallback;
+    VkBuffer m_screenshotBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_screenshotBufferMemory = VK_NULL_HANDLE;
 
     static const uint32_t kTextureCount = 3;
     static const VkFormat kTextureFormat = VK_FORMAT_R8_UNORM;

@@ -43,6 +43,15 @@ public abstract class VideoRenderer {
     protected native void setFilter(int filterId);
     protected native void updateDepthData(byte[] data, int width, int height);
     protected native void setQualityParams(int samples);
+    protected native void captureNextFrame(CaptureCallback callback);
+
+    public interface CaptureCallback {
+        void onCapture(byte[] data, int width, int height);
+    }
+
+    public void captureFrame(CaptureCallback callback) {
+        captureNextFrame(callback);
+    }
 
     public abstract void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror);
 

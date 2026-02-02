@@ -127,6 +127,7 @@ public class AIDepthProcessor {
                     runInference(yuvData, width, height, rotation);
                 } catch (Exception e) {
                     Log.e(TAG, "Inference error", e);
+                    isProcessing.set(false);
                 } finally {
                     isProcessing.set(false);
                 }
@@ -141,14 +142,14 @@ public class AIDepthProcessor {
         }
 
         try {
-            // 1. Convert YUV to RGB and Resize
-            convertYUVtoRGBResize(yuvData, width, height, rgbBuffer, inputSize, inputSize);
+            // 1. Convert YUV to RGB and Resize with Rotation
+            // If rotation is 90 or 270, we are effectively swapping width/height for the sampling logic
+            convertYUVtoRGBResize(yuvData, width, height, rgbBuffer, inputSize, inputSize, rotation);
 
             // 2. Fill Input Buffer
             inputBuffer.rewind();
             for(int val : rgbBuffer) {
-                // Normalize to 0-1 or -1 to 1 depending on model.
-                // Selfie Segmentation usually 0-1.
+                // Normalize to 0-1
                 inputBuffer.putFloat(((val >> 16) & 0xFF) / 255.0f);
                 inputBuffer.putFloat(((val >> 8) & 0xFF) / 255.0f);
                 inputBuffer.putFloat((val & 0xFF) / 255.0f);
@@ -162,25 +163,51 @@ public class AIDepthProcessor {
             outputBuffer.rewind();
             byte[] depthMap = new byte[inputSize * inputSize];
             for (int i = 0; i < inputSize * inputSize; i++) {
-                // Typically output is [BG, FG] or just mask.
                 // Assuming [BG_logit, FG_logit]
                 float bg = outputBuffer.getFloat();
                 float fg = outputBuffer.getFloat();
-
-                // Sigmoid of difference: 1 / (1 + exp(bg - fg))
-                // Optim: just check if fg > bg? No we need smooth gradient for antialiasing
                 float prob = (float) (1.0 / (1.0 + Math.exp(bg - fg)));
                 depthMap[i] = (byte) (prob * 255);
             }
 
+            // 5. Rotate Mask Back to Original Orientation
+            // We rotated INPUT by 'rotation' to be upright.
+            // So we must rotate OUTPUT by '-rotation' (or 360-rotation) to match original frame.
+            int backRotation = (360 - rotation) % 360;
+            byte[] finalMask = rotateMask(depthMap, inputSize, inputSize, backRotation);
+
             if (callback != null) {
-                callback.onDepthMapReady(depthMap, inputSize, inputSize);
+                callback.onDepthMapReady(finalMask, inputSize, inputSize);
             }
 
         } catch (Exception e) {
-            // Log.w(TAG, "Inference failed (using mock): " + e.getMessage());
+            Log.e(TAG, "Inference failed (using mock): " + e.getMessage());
+            e.printStackTrace();
             runMockInference();
         }
+    }
+
+    private byte[] rotateMask(byte[] input, int width, int height, int rotation) {
+        if (rotation == 0) return input;
+
+        byte[] output = new byte[width * height];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int newX = x, newY = y;
+                if (rotation == 90) {
+                    newX = height - 1 - y;
+                    newY = x;
+                } else if (rotation == 180) {
+                    newX = width - 1 - x;
+                    newY = height - 1 - y;
+                } else if (rotation == 270) {
+                    newX = y;
+                    newY = width - 1 - x;
+                }
+                output[newY * width + newX] = input[y * width + x];
+            }
+        }
+        return output;
     }
 
     private void runMockInference() {
@@ -208,27 +235,51 @@ public class AIDepthProcessor {
         }
     }
 
-    private void convertYUVtoRGBResize(byte[] yuv, int srcWidth, int srcHeight, int[] outRgb, int dstWidth, int dstHeight) {
-        // Nearest neighbor resize from NV21 YUV
+    private void convertYUVtoRGBResize(byte[] yuv, int srcWidth, int srcHeight, int[] outRgb, int dstWidth, int dstHeight, int rotation) {
         int frameSize = srcWidth * srcHeight;
+
         for (int j = 0; j < dstHeight; j++) {
-            int srcY = j * srcHeight / dstHeight;
-            int yIdx = srcY * srcWidth;
-            int uvIdx = frameSize + (srcY >> 1) * srcWidth;
-
             for (int i = 0; i < dstWidth; i++) {
-                int srcX = i * srcWidth / dstWidth;
-                int idx = yIdx + srcX;
+                // Calculate sampling coordinates based on rotation
+                int sampleX = 0, sampleY = 0;
 
-                int y = (0xff & ((int) yuv[idx]));
-                // NV21: V U V U
-                int uvOffset = (srcX & ~1);
-                int v = (0xff & ((int) yuv[uvIdx + uvOffset]));
-                int u = (0xff & ((int) yuv[uvIdx + uvOffset + 1]));
+                if (rotation == 0) {
+                    sampleX = i * srcWidth / dstWidth;
+                    sampleY = j * srcHeight / dstHeight;
+                } else if (rotation == 90) {
+                    // Rotated 90 CW: Destination (i, j) maps to Source (srcWidth - 1 - Y, X)
+                    // Wait, logic check:
+                    // Input: WxH. We rotate 90. Output: HxW.
+                    // If we want a 256x256 crop from center, or resize whole thing?
+                    // We resize the whole thing.
+                    // dstWidth is implicitly related to srcHeight now.
+
+                    // i (x) in dst corresponds to y in src.
+                    // j (y) in dst corresponds to x in src (inverted).
+                    sampleX = j * srcWidth / dstHeight;
+                    sampleY = (dstWidth - 1 - i) * srcHeight / dstWidth;
+                } else if (rotation == 180) {
+                     sampleX = (dstWidth - 1 - i) * srcWidth / dstWidth;
+                     sampleY = (dstHeight - 1 - j) * srcHeight / dstHeight;
+                } else if (rotation == 270) {
+                     // 270 CW (90 CCW)
+                     sampleX = (dstHeight - 1 - j) * srcWidth / dstHeight;
+                     sampleY = i * srcHeight / dstWidth;
+                }
+
+                // Clamp
+                if (sampleX < 0) sampleX = 0; if (sampleX >= srcWidth) sampleX = srcWidth - 1;
+                if (sampleY < 0) sampleY = 0; if (sampleY >= srcHeight) sampleY = srcHeight - 1;
+
+                int yIdx = sampleY * srcWidth + sampleX;
+                int uvIdx = frameSize + (sampleY >> 1) * srcWidth + (sampleX & ~1);
+
+                int y = (0xff & ((int) yuv[yIdx]));
+                int v = (0xff & ((int) yuv[uvIdx]));
+                int u = (0xff & ((int) yuv[uvIdx + 1]));
 
                 y = y < 16 ? 16 : y;
 
-                // Integer math for speed
                 int y1192 = 1192 * (y - 16);
                 int r = (y1192 + 1634 * (v - 128));
                 int g = (y1192 - 833 * (v - 128) - 400 * (u - 128));
