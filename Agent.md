@@ -19,7 +19,7 @@
 ‎    compileSdk 35
 ‎    buildToolsVersion "35.0.1" // wajib
 ‎    ndkVersion "28.2.13676358" // wajib
-‎      - CMake Version: 4.1.1 (wajib)
+‎      - CMake Version: 3.22.1 (wajib)
 ‎  - Build System: Ninja (Implicitly supported by CMake suite)
 ‎
 ‎
