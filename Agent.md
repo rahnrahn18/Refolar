@@ -19,14 +19,17 @@
 ‎    compileSdk 35
 ‎    buildToolsVersion "35.0.1" // wajib
 ‎    ndkVersion "28.2.13676358" // wajib
-‎      - CMake Version: 3.22.1 (wajib)
+‎      - CMake Version: 4.1.1 //wajib 
+(cmake version 4.1.1
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake ada))
 ‎  - Build System: Ninja (Implicitly supported by CMake suite)
 ‎
 ‎
 ‎
 ‎---
 ‎Penting !
-‎location android-sdk in my enviroment: "/data/user/0/com.tom.rv2ide/files/home/android-sdk/"
+‎location android-sdk in my enviroment pada device saya: "/data/user/0/com.tom.rv2ide/files/home/android-sdk/"
 ‎Karena CompileSdk 35 (Android 15) dan Build-Tools 35.0.1, pastikan di file build.gradle (Project Level) atau libs.versions.toml, versi Plugin Android kamu minimal 8.4.0 atau lebih baru (8.5/8.6 recommended).
 ‎---
 ‎***
