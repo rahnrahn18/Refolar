@@ -40,6 +40,7 @@ public abstract class VideoRenderer {
 
     protected native void setPortraitMode(boolean enabled);
     protected native void setBlurStrength(float strength);
+    protected native void setFilter(int filterId);
 
     public abstract void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror);
 

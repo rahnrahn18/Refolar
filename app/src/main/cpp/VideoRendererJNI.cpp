@@ -66,3 +66,9 @@ JCMCPRV(void, setBlurStrength)(JNIEnv *env, jobject obj, jfloat strength) {
 
     if (context) context->setBlurStrength(strength);
 }
+
+JCMCPRV(void, setFilter)(JNIEnv *env, jobject obj, jint filterId) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->setFilter(filterId);
+}

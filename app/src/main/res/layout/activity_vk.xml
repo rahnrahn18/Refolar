@@ -31,6 +31,17 @@
             android:contentDescription="Settings" />
     </LinearLayout>
 
+    <!-- Filter List (Hidden by default) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/filter_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:background="@drawable/gradient_overlay"
+        android:paddingVertical="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/bottom_controls"/>
+
     <!-- Bottom Controls Area -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottom_controls"
@@ -119,7 +130,7 @@
             app:layout_constraintTop_toTopOf="@+id/btn_shutter"
             app:layout_constraintBottom_toBottomOf="@+id/btn_shutter" />
 
-        <!-- Portrait Toggle Button (Above Gallery) -->
+        <!-- Portrait Toggle Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_portrait_toggle"
             style="@style/Widget.Material3.Button.TonalButton"
@@ -132,8 +143,25 @@
             android:layout_marginBottom="24dp"
             app:layout_constraintBottom_toTopOf="@+id/btn_gallery"
             app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/btn_filter_toggle"
+            app:layout_constraintHorizontal_chainStyle="packed"
+            android:layout_marginEnd="8dp"/>
+
+        <!-- Filter Toggle Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_filter_toggle"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Filter"
+            app:icon="@drawable/ic_gallery"
+            app:backgroundTint="@color/colorSurface"
+            android:textColor="@color/colorPrimary"
+            android:layout_marginBottom="24dp"
+            app:layout_constraintBottom_toTopOf="@+id/btn_gallery"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.5" />
+            app:layout_constraintStart_toEndOf="@+id/btn_portrait_toggle"
+            android:layout_marginStart="8dp"/>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

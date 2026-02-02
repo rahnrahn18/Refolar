@@ -182,6 +182,10 @@ public class CameraController implements PreviewFrameHandler {
                 mImageReader.close();
                 mImageReader = null;
             }
+            if (null != mJpegImageReader) {
+                mJpegImageReader.close();
+                mJpegImageReader = null;
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
         } finally {

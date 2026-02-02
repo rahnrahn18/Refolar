@@ -25,6 +25,10 @@ public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Call
         setBlurStrength(strength);
     }
 
+    public void updateFilter(int filterId) {
+        setFilter(filterId);
+    }
+
     @Override
     public void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror) {
         draw(data, width, height, rotation, mirror);

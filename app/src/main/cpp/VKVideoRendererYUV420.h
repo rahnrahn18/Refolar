@@ -36,6 +36,13 @@ public:
         m_blurStrength = strength;
     }
 
+    void setFilter(int filterId) override {
+        if (m_filterId != filterId) {
+            m_filterId = filterId;
+            isDirty = true;
+        }
+    }
+
 private:
     enum TextureType {
         tTexY, tTexU, tTexV
@@ -58,6 +65,7 @@ private:
 
     bool m_isPortrait = false;
     float m_blurStrength = 5.0f;
+    int m_filterId = 0; // 0: Normal, 1: Grey, 2: Sepia, 3: Invert
 
     struct VulkanTexture {
         VkSampler sampler;

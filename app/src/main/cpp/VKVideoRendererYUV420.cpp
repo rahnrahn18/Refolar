@@ -213,7 +213,15 @@ void VKVideoRendererYUV420::deleteRenderPass() const {
 }
 
 int VKVideoRendererYUV420::createProgram(const char *pVertexSource, const char *pFragmentSource) {
-    VkResult res = createGraphicsPipeline(&m_gfxPipeline, "shaders/video_frame.vert.spv", "shaders/video_frame.frag.spv");
+    const char *filterShader = "shaders/video_frame.frag.spv";
+    switch (m_filterId) {
+        case 1: filterShader = "shaders/filter_grey.frag.spv"; break;
+        case 2: filterShader = "shaders/filter_sepia.frag.spv"; break;
+        case 3: filterShader = "shaders/filter_invert.frag.spv"; break;
+        default: filterShader = "shaders/video_frame.frag.spv"; break;
+    }
+
+    VkResult res = createGraphicsPipeline(&m_gfxPipeline, "shaders/video_frame.vert.spv", filterShader);
     if (res != VK_SUCCESS) return res;
     return createGraphicsPipeline(&m_gfxPipelineBokeh, "shaders/bokeh_portrait.vert.spv", "shaders/bokeh_portrait.frag.spv");
 }
