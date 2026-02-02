@@ -55,7 +55,7 @@ private:
 
     bool m_isPortrait = false;
     float m_blurStrength = 5.0f;
-    int m_filterId = 0; // 0: Normal, 1: Grey, 2: Sepia, 3: Invert
+    int m_filterId = 0; // 0: Normal, 1: Grey, 2: Sepia, 3: Invert, 4: Beauty
     int m_sampleCount = 16;
 
     std::unique_ptr<IDepthProvider> m_depthProvider;

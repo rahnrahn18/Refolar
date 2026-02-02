@@ -49,11 +49,13 @@ void main() {
     float coc = clamp(1.0 - mask, 0.0, 1.0);
 
     // Dynamic blur radius based on aperture (blurStrength) and CoC
+    // Adjusted coefficient for more pronounced but controlled blur
     float maxBlurRadius = ubo.blurStrength * 0.005;
     float radius = coc * maxBlurRadius;
 
     // Optimization: If blur is negligible, return center color immediately
-    if (radius < 0.0005) {
+    // Increased threshold slightly to avoid micro-blur on edges
+    if (radius < 0.0008) {
         uFragColor = vec4(centerColor, 1.0);
         return;
     }

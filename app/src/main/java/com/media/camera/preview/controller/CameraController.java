@@ -92,7 +92,7 @@ public class CameraController implements PreviewFrameHandler {
         mWidth = width;
         mHeight = height;
 
-        setupCameraId(CameraCharacteristics.LENS_FACING_FRONT);
+        setupCameraId(CameraCharacteristics.LENS_FACING_BACK);
 
         mPreviewSize = getOptimalPreviewSize(width, height);
 
