@@ -41,6 +41,16 @@ public class SegmentationEngine {
         }
     }
 
+    public void generateMask(byte[] yuvData, int width, int height, int rotation, SegmentationCallback callback) {
+        if (mProcessor != null) {
+            mProcessor.generateMask(yuvData, width, height, rotation, (depthData, w, h) -> {
+                if (callback != null) {
+                    callback.onMaskReady(depthData, w, h);
+                }
+            });
+        }
+    }
+
     public void stop() {
         if (mProcessor != null) {
             mProcessor.stop();

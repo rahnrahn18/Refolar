@@ -894,13 +894,6 @@ VkResult VKVideoRendererYUV420::createGraphicsPipeline(VulkanGfxPipelineInfo *pi
     CALL_VK(vkCreatePipelineLayout(m_deviceInfo.device, &pipelineLayoutCreateInfo,
                                    nullptr, &pipelineInfo->layout))
 
-    // No dynamic state in that tutorial
-    VkPipelineDynamicStateCreateInfo dynamicStateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .dynamicStateCount = 0,
-            .pDynamicStates = nullptr};
-
     VkShaderModule vertexShader, fragmentShader;
 
     RET_CHECK(createShaderModuleFromAsset(m_deviceInfo.device, vertShaderName,

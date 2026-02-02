@@ -46,6 +46,7 @@ public:
     virtual void setQualityParams(int samples) {}
 
     virtual void captureNextFrame(std::function<void(uint8_t*, int, int)> callback) {}
+    virtual void renderStill(uint8_t* yuv, uint8_t* mask, int width, int height, std::function<void(uint8_t*, int, int)> callback) {}
 
     virtual int createProgram(const char *pVertexSource, const char *pFragmentSource) = 0;
 
