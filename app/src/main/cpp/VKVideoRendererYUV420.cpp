@@ -262,8 +262,8 @@ VKVideoRendererYUV420::createDevice(ANativeWindow *platformWindow, VkApplication
     // for this sample, we use the very first GPU device found on the system
     uint32_t gpuCount = 0;
     CALL_VK(vkEnumeratePhysicalDevices(m_deviceInfo.instance, &gpuCount, nullptr))
-    VkPhysicalDevice tmpGpus[gpuCount];
-    CALL_VK(vkEnumeratePhysicalDevices(m_deviceInfo.instance, &gpuCount, tmpGpus))
+    std::vector<VkPhysicalDevice> tmpGpus(gpuCount);
+    CALL_VK(vkEnumeratePhysicalDevices(m_deviceInfo.instance, &gpuCount, tmpGpus.data()))
     m_deviceInfo.physicalDevice = tmpGpus[0];  // Pick up the first GPU Device
 
     vkGetPhysicalDeviceMemoryProperties(m_deviceInfo.physicalDevice,
