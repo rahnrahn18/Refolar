@@ -29,6 +29,7 @@ vec3 yuv2rgb(vec2 uv_coord) {
     return clamp(vec3(r, g, b), 0.0, 1.0);
 }
 
+// Golden Angle = 2.39996323 radians (~137.5 degrees)
 const float GOLDEN_ANGLE = 2.39996323;
 
 void main() {
@@ -39,42 +40,47 @@ void main() {
         return;
     }
 
-    // Sample depth mask.
-    // Assumes 1.0 = Subject (Sharp), 0.0 = Background (Blur)
+    // Sample depth mask (AI Prediction or Hardware Depth)
+    // 1.0 = Subject (Sharp), 0.0 = Background (Blur)
     float mask = texture(depthTex, texcoord).r;
 
-    // Invert mask for Circle of Confusion (CoC)
-    // 1.0 (Subject) -> 0.0 blur. 0.0 (Background) -> 1.0 blur.
+    // Calculate Circle of Confusion (CoC)
+    // Mimic lens characteristics: Objects far from focal plane (0.0 mask) have larger CoC.
     float coc = clamp(1.0 - mask, 0.0, 1.0);
 
-    // Dynamic blur radius based on strength and CoC
+    // Dynamic blur radius based on aperture (blurStrength) and CoC
     float maxBlurRadius = ubo.blurStrength * 0.005;
     float radius = coc * maxBlurRadius;
 
-    // Optimization: If blur is negligible, return center color
+    // Optimization: If blur is negligible, return center color immediately
     if (radius < 0.0005) {
         uFragColor = vec4(centerColor, 1.0);
         return;
     }
 
+    // Accumulate samples for Cinematic Disk Blur (Bokeh)
+    // Uses Golden Angle Spiral distribution to avoid banding artifacts and simulate circular aperture.
+    // Inspired by "Circular DoF" techniques (though implemented as single-pass stochastic gather here).
+
     vec3 accColor = centerColor;
     float totalWeight = 1.0;
 
     int samples = ubo.sampleCount;
+    // Clamp sample count to avoid GPU hangs or poor quality
     if (samples < 4) samples = 4;
-    if (samples > 64) samples = 64; // Hard cap for performance safety
+    if (samples > 64) samples = 64;
 
     for (int i = 1; i < 64; i++) {
         if (i >= samples) break;
 
         float theta = float(i) * GOLDEN_ANGLE;
-        // Radius distribution: sqrt(i / N) ensures uniform area sampling
+        // Radius distribution: sqrt(i / N) ensures uniform area sampling of the disk
         float r = sqrt(float(i) / float(samples)) * radius;
 
         vec2 offset = vec2(cos(theta), sin(theta)) * r;
 
-        // Note: Ideally correct for aspect ratio here, but ignoring for simplicity
-        // as per previous implementation style.
+        // Correct aspect ratio would be ideal, but assuming square pixels/isotropic blur for now.
+        // Aspect correction: offset.x *= aspect_ratio;
 
         accColor += yuv2rgb(texcoord + offset);
         totalWeight += 1.0;

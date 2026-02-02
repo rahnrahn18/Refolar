@@ -52,13 +52,25 @@ public class AIDepthProcessor {
         try {
             Interpreter.Options options = new Interpreter.Options();
             CompatibilityList compatList = new CompatibilityList();
+            boolean gpuInitialized = false;
 
-            if (compatList.isDelegateSupportedOnThisDevice()) {
-                GpuDelegate.Options delegateOptions = compatList.getBestOptionsForThisDevice();
-                gpuDelegate = new GpuDelegate(delegateOptions);
-                options.addDelegate(gpuDelegate);
-                Log.i(TAG, "Using GPU Delegate");
-            } else {
+            try {
+                if (compatList.isDelegateSupportedOnThisDevice()) {
+                    GpuDelegate.Options delegateOptions = compatList.getBestOptionsForThisDevice();
+                    gpuDelegate = new GpuDelegate(delegateOptions);
+                    options.addDelegate(gpuDelegate);
+                    Log.i(TAG, "Using GPU Delegate");
+                    gpuInitialized = true;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "GPU Delegate failed to initialize, falling back to CPU", e);
+                if (gpuDelegate != null) {
+                    gpuDelegate.close();
+                    gpuDelegate = null;
+                }
+            }
+
+            if (!gpuInitialized) {
                 options.setNumThreads(4);
                 Log.i(TAG, "Using CPU with 4 threads");
             }
