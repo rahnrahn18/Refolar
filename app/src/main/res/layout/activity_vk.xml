@@ -18,7 +18,7 @@
         android:orientation="vertical"
         android:padding="24dp"
         android:background="@drawable/gradient_overlay"
-        app:layout_bottom_toBottomOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
