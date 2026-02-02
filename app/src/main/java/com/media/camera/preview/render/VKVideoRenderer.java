@@ -1,7 +1,7 @@
 package com.media.camera.preview.render;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
@@ -15,6 +15,18 @@ public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Call
 
     public void init(SurfaceView surface) {
         surface.getHolder().addCallback(this);
+    }
+
+    public void updatePortraitMode(boolean enabled) {
+        setPortraitMode(enabled);
+    }
+
+    public void updateBlurStrength(float strength) {
+        setBlurStrength(strength);
+    }
+
+    public void updateFilter(int filterId) {
+        setFilter(filterId);
     }
 
     @Override

@@ -27,6 +27,10 @@ public:
 
     uint32_t getParameters();
 
+    void setPortraitMode(bool enable);
+    void setBlurStrength(float strength);
+    void setFilter(int filterId);
+
     static void createContext(JNIEnv *env, jobject obj, jint type);
 
     static void storeContext(JNIEnv *env, jobject obj, VideoRendererContext *context);

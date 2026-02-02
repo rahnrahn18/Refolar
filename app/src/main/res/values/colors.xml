@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="colorBackground">#000000</color>
+    <color name="colorPrimary">#D0BCFF</color>
+    <color name="colorOnPrimary">#381E72</color>
+    <color name="colorSecondary">#CCC2DC</color>
+    <color name="colorSurface">#1C1B1F</color>
+    <color name="colorOnSurface">#E6E1E5</color>
+    <color name="colorControlNormal">#938F99</color>
+    <color name="colorAccent">#D0BCFF</color>
+    <color name="transparent_overlay">#80000000</color>
 </resources>

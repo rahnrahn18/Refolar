@@ -54,3 +54,21 @@ JCMCPRV(jint, getParameters)(JNIEnv *env, jobject obj) {
 
     return 0;
 }
+
+JCMCPRV(void, setPortraitMode)(JNIEnv *env, jobject obj, jboolean enabled) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->setPortraitMode(enabled);
+}
+
+JCMCPRV(void, setBlurStrength)(JNIEnv *env, jobject obj, jfloat strength) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->setBlurStrength(strength);
+}
+
+JCMCPRV(void, setFilter)(JNIEnv *env, jobject obj, jint filterId) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->setFilter(filterId);
+}
