@@ -31,6 +31,24 @@ VKVideoRendererYUV420::~VKVideoRendererYUV420() {
     m_deviceInfo.initialized = false;
 }
 
+void VKVideoRendererYUV420::setFilter(int filterId) {
+    if (m_filterId != filterId) {
+        m_filterId = filterId;
+        isDirty = true;
+    }
+}
+
+void VKVideoRendererYUV420::setPortraitMode(bool enable) {
+    if (m_isPortrait != enable) {
+        m_isPortrait = enable;
+        isDirty = true;
+    }
+}
+
+void VKVideoRendererYUV420::setBlurStrength(float strength) {
+    m_blurStrength = strength;
+}
+
 void VKVideoRendererYUV420::createRenderPipeline() {
     createRenderPass();
     createFrameBuffers(); // Create 2 frame buffers.
@@ -108,19 +126,27 @@ void VKVideoRendererYUV420::draw(uint8_t *buffer, size_t length, size_t width, s
     m_rotation = rotation;
     m_mirror = mirror;
 
+    // Trigger full pipeline rebuild if size changes OR dirty flag (filters/portrait) is set
     if (isInitialized() && ((m_frameWidth != width || m_frameHeight != height) || isDirty)) {
         m_frameWidth = width;
         m_frameHeight = height;
         isDirty = false;
 
+        // Cleanup existing pipeline resources
         deleteUniformBuffers();
         deleteTextures();
         deleteCommandPool();
+        deleteGraphicsPipeline(); // Critical: delete old shaders/pipeline
 
+        // Recreate everything
         createUniformBuffers();
         createTextures();
-        updateDescriptorSet();
+        createProgram(nullptr, nullptr); // Critical: load new shaders based on filterId
+        createDescriptorSet();
         createCommandPool();
+
+        // Note: We don't delete buffers/renderpass/swapchain as they depend on surface size/window,
+        // not logic changes. If frame size changes, createTextures handles image resizing.
     } else {
         m_frameWidth = width;
         m_frameHeight = height;
@@ -130,7 +156,7 @@ void VKVideoRendererYUV420::draw(uint8_t *buffer, size_t length, size_t width, s
         createRenderPipeline();
     } else {
         updateTextures();
-        updateUniformBuffers(); // Ensure UBO is updated every frame if needed (or just when dirty)
+        updateUniformBuffers();
     }
 
     if (isInitialized()) {
@@ -969,7 +995,7 @@ bool VKVideoRendererYUV420::mapMemoryTypeToIndex(uint32_t typeBits, VkFlags requ
     for (uint32_t i = 0; i < 32; i++) {
         if ((typeBits & 1) == 1) {
             // Type is available, does it match user properties?
-            if ((memoryProperties.memoryTypes[i].propertyFlags & requirements_mask) ==
+            if ((m_deviceInfo.memoryProperties.memoryTypes[i].propertyFlags & requirements_mask) ==
                 requirements_mask) {
                 *typeIndex = i;
                 return true;

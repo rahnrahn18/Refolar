@@ -25,24 +25,9 @@ public:
 
     int createProgram(const char *pVertexSource, const char *pFragmentSource) override;
 
-    void setPortraitMode(bool enable) override {
-        if (m_isPortrait != enable) {
-            m_isPortrait = enable;
-            isDirty = true;
-        }
-    }
-
-    void setBlurStrength(float strength) override {
-        m_blurStrength = strength;
-    }
-
-    void setFilter(int filterId) override {
-        // Update filter if changed
-        if (m_filterId != filterId) {
-            m_filterId = filterId;
-            isDirty = true;
-        }
-    }
+    void setPortraitMode(bool enable) override;
+    void setBlurStrength(float strength) override;
+    void setFilter(int filterId) override;
 
 private:
     enum TextureType {

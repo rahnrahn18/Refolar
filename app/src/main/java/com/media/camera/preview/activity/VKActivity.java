@@ -1,6 +1,10 @@
 package com.media.camera.preview.activity;
 
+import android.Manifest;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.SurfaceView;
@@ -10,6 +14,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -25,12 +32,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class VKActivity extends BaseActivity {
+public class VKActivity extends BaseActivity implements ActivityCompat.OnRequestPermissionsResultCallback {
+
+    private static final int REQUEST_CAMERA_PERMISSION = 1;
+    private static final String FRAGMENT_DIALOG = "dialog";
+    private static final String[] CAMERA_PERMISSIONS = {
+            Manifest.permission.CAMERA
+    };
 
     private VKVideoRenderer mVideoRenderer;
     private boolean isPortraitMode = false;
     private boolean isFilterMode = false;
     private float aperture = 5.0f;
+    private ErrorDialog mErrorDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -160,12 +174,18 @@ public class VKActivity extends BaseActivity {
     @Override
     public void onResume() {
         super.onResume();
-        mCameraController.startCamera();
+        if (!hasPermissionsGranted()) {
+            requestCameraPermission();
+        } else {
+            mCameraController.startCamera();
+        }
     }
 
     @Override
     public void onPause() {
-        mCameraController.stopCamera();
+        if (hasPermissionsGranted()) {
+            mCameraController.stopCamera();
+        }
         super.onPause();
     }
 
@@ -180,6 +200,97 @@ public class VKActivity extends BaseActivity {
                 break;
             default:
                 break;
+        }
+    }
+
+    private boolean hasPermissionsGranted() {
+        for (String permission : CAMERA_PERMISSIONS) {
+            if (ActivityCompat.checkSelfPermission(this, permission)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void requestCameraPermission() {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+            new ConfirmationDialog().show(getSupportFragmentManager(), FRAGMENT_DIALOG);
+        } else {
+            requestPermissions(CAMERA_PERMISSIONS, REQUEST_CAMERA_PERMISSION);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.length == CAMERA_PERMISSIONS.length) {
+                for (int result : grantResults) {
+                    if (result != PackageManager.PERMISSION_GRANTED) {
+                        if (null == mErrorDialog || mErrorDialog.isHidden()) {
+                            mErrorDialog = ErrorDialog.newInstance(getString(R.string.request_permission));
+                            mErrorDialog.show(getSupportFragmentManager(), FRAGMENT_DIALOG);
+                        }
+                        break;
+                    } else {
+                        if (null != mErrorDialog) {
+                            mErrorDialog.dismiss();
+                        } else {
+                            // Permission granted, recreate to start camera
+                            recreate();
+                        }
+                    }
+                }
+            }
+        } else {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+    }
+
+    /**
+     * Shows an error message dialog.
+     */
+    public static class ErrorDialog extends DialogFragment {
+
+        private static final String ARG_MESSAGE = "message";
+
+        public static ErrorDialog newInstance(String message) {
+            ErrorDialog dialog = new ErrorDialog();
+            Bundle args = new Bundle();
+            args.putString(ARG_MESSAGE, message);
+            dialog.setArguments(args);
+            return dialog;
+        }
+
+        @NonNull
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            final android.app.Activity activity = getActivity();
+            assert activity != null;
+            assert getArguments() != null;
+            return new AlertDialog.Builder(activity)
+                    .setMessage(getArguments().getString(ARG_MESSAGE))
+                    .setPositiveButton(android.R.string.ok, (dialogInterface, i) -> activity.finish())
+                    .create();
+        }
+    }
+
+    /**
+     * Shows OK/Cancel confirmation dialog about camera permission.
+     */
+    public static class ConfirmationDialog extends DialogFragment {
+
+        @NonNull
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            final android.app.Activity activity = getActivity();
+            assert activity != null;
+            return new AlertDialog.Builder(activity)
+                    .setMessage(R.string.request_permission)
+                    .setPositiveButton(android.R.string.ok, (dialog, which) -> ActivityCompat
+                            .requestPermissions(activity, CAMERA_PERMISSIONS, REQUEST_CAMERA_PERMISSION))
+                    .setNegativeButton(android.R.string.cancel, (dialog, which) -> activity.finish())
+                    .create();
         }
     }
 }
