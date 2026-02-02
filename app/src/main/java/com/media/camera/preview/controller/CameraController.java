@@ -294,6 +294,28 @@ public class CameraController implements PreviewFrameHandler {
 
     public void takePicture() {
         if (null == mCameraDevice || null == mCaptureSession || null == mJpegImageReader) return;
+
+        mVideoRenderer.captureFrame((data, width, height) -> {
+            mBackgroundHandler.post(() -> {
+                try {
+                    android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
+                    bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(data));
+
+                    java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, bos);
+                    byte[] jpegData = bos.toByteArray();
+
+                    String filename = "IMG_" + System.currentTimeMillis();
+                    new Handler(mContext.getMainLooper()).post(() -> {
+                        mStorageController.saveImage(jpegData, filename);
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "Error saving captured image", e);
+                }
+            });
+        });
+
+        /* Legacy Direct Capture - Bypassed to support rendering effects
         try {
             final CaptureRequest.Builder captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureBuilder.addTarget(mJpegImageReader.getSurface());
@@ -302,17 +324,13 @@ public class CameraController implements PreviewFrameHandler {
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation());
 
-            // Stop preview before capture to ensure stability? Not strictly necessary for single capture but common.
-            // mCaptureSession.stopRepeating();
-            // Abort captures?
-            // For simplicity/speed in this demo, just capture.
-
             mCaptureSession.capture(captureBuilder.build(), new CameraCaptureSession.CaptureCallback() {
                 // Optional: Handle capture completed
             }, mBackgroundHandler);
         } catch (CameraAccessException e) {
             Log.e(TAG, "takePicture failed", e);
         }
+        */
     }
 
     /**

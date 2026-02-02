@@ -50,6 +50,43 @@ void VideoRendererContext::setQualityParams(int samples) {
     m_pVideoRenderer->setQualityParams(samples);
 }
 
+void VideoRendererContext::captureNextFrame(JNIEnv *env, jobject callback) {
+    if (!m_pVideoRenderer) return;
+
+    jobject callbackGlobal = env->NewGlobalRef(callback);
+    JavaVM* jvm;
+    env->GetJavaVM(&jvm);
+
+    m_pVideoRenderer->captureNextFrame([jvm, callbackGlobal](uint8_t* data, int width, int height) {
+        JNIEnv* env;
+        bool needsDetach = false;
+        int getEnvStat = jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+        if (getEnvStat == JNI_EDETACHED) {
+            if (jvm->AttachCurrentThread(&env, nullptr) != 0) {
+                return;
+            }
+            needsDetach = true;
+        } else if (getEnvStat == JNI_EVERSION) {
+            return;
+        }
+
+        jclass callbackClass = env->GetObjectClass(callbackGlobal);
+        jmethodID onCaptureMethod = env->GetMethodID(callbackClass, "onCapture", "([BII)V");
+        if (onCaptureMethod) {
+            jbyteArray byteArray = env->NewByteArray(width * height * 4);
+            env->SetByteArrayRegion(byteArray, 0, width * height * 4, (jbyte*)data);
+            env->CallVoidMethod(callbackGlobal, onCaptureMethod, byteArray, width, height);
+            env->DeleteLocalRef(byteArray);
+        }
+
+        env->DeleteGlobalRef(callbackGlobal);
+
+        if (needsDetach) {
+            jvm->DetachCurrentThread();
+        }
+    });
+}
+
 void VideoRendererContext::createContext(JNIEnv *env, jobject obj, jint type) {
     auto *context = new VideoRendererContext(type);
 

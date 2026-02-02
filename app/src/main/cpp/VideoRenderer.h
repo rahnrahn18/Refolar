@@ -2,6 +2,7 @@
 #define _H_VIDEO_RENDERER_
 
 #include <memory>
+#include <functional>
 #include <android/native_window.h>
 #include <android/asset_manager.h>
 
@@ -43,6 +44,8 @@ public:
     virtual void setFilter(int filterId) {}
     virtual void updateDepthData(uint8_t *data, size_t width, size_t height) {}
     virtual void setQualityParams(int samples) {}
+
+    virtual void captureNextFrame(std::function<void(uint8_t*, int, int)> callback) {}
 
     virtual int createProgram(const char *pVertexSource, const char *pFragmentSource) = 0;
 

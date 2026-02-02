@@ -26,6 +26,11 @@ VKVideoRendererYUV420::~VKVideoRendererYUV420() {
     deleteRenderPass();
     deleteSwapChain();
 
+    if (m_screenshotBuffer) {
+        vkDestroyBuffer(m_deviceInfo.device, m_screenshotBuffer, nullptr);
+        vkFreeMemory(m_deviceInfo.device, m_screenshotBufferMemory, nullptr);
+    }
+
     vkDestroyDevice(m_deviceInfo.device, nullptr);
     vkDestroyInstance(m_deviceInfo.instance, nullptr);
 
@@ -58,6 +63,11 @@ void VKVideoRendererYUV420::updateDepthData(uint8_t *data, size_t width, size_t 
 
 void VKVideoRendererYUV420::setQualityParams(int samples) {
     m_sampleCount = samples;
+}
+
+void VKVideoRendererYUV420::captureNextFrame(std::function<void(uint8_t*, int, int)> callback) {
+    m_captureCallback = callback;
+    m_captureRequest = true;
 }
 
 void VKVideoRendererYUV420::createRenderPipeline() {
@@ -120,6 +130,95 @@ void VKVideoRendererYUV420::render() {
     };
     CALL_VK(vkQueueSubmit(m_deviceInfo.queue, 1, &submitInfo, m_render.fence))
     CALL_VK(vkWaitForFences(m_deviceInfo.device, 1, &m_render.fence, VK_TRUE, 100000000))
+
+    if (m_captureRequest) {
+        VkExtent2D extent = m_swapchainInfo.displaySize;
+        size_t size = extent.width * extent.height * 4; // R8G8B8A8
+
+        // Create buffer if needed
+        if (m_screenshotBuffer == VK_NULL_HANDLE) {
+             createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 m_screenshotBuffer, m_screenshotBufferMemory);
+        }
+
+        // Copy image to buffer
+        VkCommandPoolCreateInfo cmdPoolCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            .queueFamilyIndex = m_deviceInfo.queueFamilyIndex,
+        };
+        VkCommandPool cmdPool;
+        vkCreateCommandPool(m_deviceInfo.device, &cmdPoolCreateInfo, nullptr, &cmdPool);
+
+        VkCommandBuffer cmdBuffer;
+        VkCommandBufferAllocateInfo allocInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .commandPool = cmdPool,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1,
+        };
+        vkAllocateCommandBuffers(m_deviceInfo.device, &allocInfo, &cmdBuffer);
+
+        VkCommandBufferBeginInfo beginInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        };
+        vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+
+        // Transition to TRANSFER_SRC
+        setImageLayout(cmdBuffer, m_swapchainInfo.displayImages[nextIndex],
+                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+        VkBufferImageCopy region{
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .imageOffset = {0, 0, 0},
+            .imageExtent = {extent.width, extent.height, 1},
+        };
+
+        vkCmdCopyImageToBuffer(cmdBuffer, m_swapchainInfo.displayImages[nextIndex],
+                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_screenshotBuffer, 1, &region);
+
+        // Transition back to PRESENT_SRC
+        setImageLayout(cmdBuffer, m_swapchainInfo.displayImages[nextIndex],
+                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+
+        vkEndCommandBuffer(cmdBuffer);
+
+        VkSubmitInfo copySubmitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &cmdBuffer,
+        };
+        vkQueueSubmit(m_deviceInfo.queue, 1, &copySubmitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(m_deviceInfo.queue);
+
+        vkFreeCommandBuffers(m_deviceInfo.device, cmdPool, 1, &cmdBuffer);
+        vkDestroyCommandPool(m_deviceInfo.device, cmdPool, nullptr);
+
+        // Read data
+        void* data;
+        vkMapMemory(m_deviceInfo.device, m_screenshotBufferMemory, 0, size, 0, &data);
+        if (m_captureCallback) {
+            m_captureCallback((uint8_t*)data, extent.width, extent.height);
+        }
+        vkUnmapMemory(m_deviceInfo.device, m_screenshotBufferMemory);
+
+        m_captureRequest = false;
+        m_captureCallback = nullptr;
+    }
 
     VkResult result;
     VkPresentInfoKHR presentInfo{
