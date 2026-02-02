@@ -37,6 +37,7 @@ public:
     }
 
     void setFilter(int filterId) override {
+        // Update filter if changed
         if (m_filterId != filterId) {
             m_filterId = filterId;
             isDirty = true;
