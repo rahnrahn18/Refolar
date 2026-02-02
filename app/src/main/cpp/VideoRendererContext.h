@@ -29,6 +29,7 @@ public:
 
     void setPortraitMode(bool enable);
     void setBlurStrength(float strength);
+    void setFilter(int filterId);
 
     static void createContext(JNIEnv *env, jobject obj, jint type);
 

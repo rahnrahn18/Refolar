@@ -38,6 +38,10 @@ void VideoRendererContext::setBlurStrength(float strength) {
     m_pVideoRenderer->setBlurStrength(strength);
 }
 
+void VideoRendererContext::setFilter(int filterId) {
+    m_pVideoRenderer->setFilter(filterId);
+}
+
 void VideoRendererContext::createContext(JNIEnv *env, jobject obj, jint type) {
     auto *context = new VideoRendererContext(type);
 
