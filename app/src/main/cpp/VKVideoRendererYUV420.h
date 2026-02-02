@@ -32,6 +32,7 @@ public:
     void updateDepthData(uint8_t *data, size_t width, size_t height) override;
     void setQualityParams(int samples) override;
     void captureNextFrame(std::function<void(uint8_t*, int, int)> callback) override;
+    void renderStill(uint8_t* yuv, uint8_t* mask, int width, int height, std::function<void(uint8_t*, int, int)> callback) override;
 
 private:
     enum TextureType {

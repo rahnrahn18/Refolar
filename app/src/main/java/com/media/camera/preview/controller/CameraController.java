@@ -143,32 +143,30 @@ public class CameraController implements PreviewFrameHandler {
         mImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.YUV_420_888, IMAGE_BUFFER_SIZE);
         mImageReader.setOnImageAvailableListener(mVideoCapture, mBackgroundHandler);
 
-        // Initialize JPEG ImageReader for high-quality capture
-        // Defensive allocation: fall back to safe formats if allocation fails
+        // Initialize ImageReader for high-quality capture (Prefer YUV for processing)
         try {
-            mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.JPEG, 2);
+            mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.YUV_420_888, 2);
         } catch (Exception e) {
-             Log.w(TAG, "Failed to allocate JPEG reader, retrying with smaller buffer or format", e);
-             // Last resort fallback (though JPEG is standard)
-             mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.YUV_420_888, 2);
+             Log.w(TAG, "Failed to allocate YUV reader, falling back to JPEG", e);
+             mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.JPEG, 2);
         }
 
         mJpegImageReader.setOnImageAvailableListener(reader -> {
             try (android.media.Image image = reader.acquireNextImage()) {
                 if (image != null) {
-                    ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                    byte[] bytes = new byte[buffer.remaining()];
-                    buffer.get(bytes);
-
-                    String filename = "IMG_" + System.currentTimeMillis();
-
-                    // Post to main thread for Toast visibility if needed, or handle in StorageController
-                    new Handler(mContext.getMainLooper()).post(() -> {
-                         mStorageController.saveImage(bytes, filename);
-                    });
+                    if (image.getFormat() == ImageFormat.JPEG) {
+                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                         byte[] bytes = new byte[buffer.remaining()];
+                         buffer.get(bytes);
+                         String filename = "IMG_" + System.currentTimeMillis();
+                         new Handler(mContext.getMainLooper()).post(() -> mStorageController.saveImage(bytes, filename));
+                    } else {
+                         byte[] yuvData = VideoCapture.YUV_420_888_data(image);
+                         processHighResImage(yuvData, image.getWidth(), image.getHeight());
+                    }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error processing JPEG", e);
+                Log.e(TAG, "Error processing Image", e);
             }
         }, mBackgroundHandler);
 
@@ -295,11 +293,29 @@ public class CameraController implements PreviewFrameHandler {
     public void takePicture() {
         if (null == mCameraDevice || null == mCaptureSession || null == mJpegImageReader) return;
 
-        mVideoRenderer.captureFrame((data, width, height) -> {
-            mBackgroundHandler.post(() -> {
-                try {
-                    android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
-                    bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(data));
+        try {
+            final CaptureRequest.Builder captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureBuilder.addTarget(mJpegImageReader.getSurface());
+
+            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation());
+
+            mCaptureSession.capture(captureBuilder.build(), new CameraCaptureSession.CaptureCallback() {
+                // Image processing happens in ImageReader listener
+            }, mBackgroundHandler);
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "takePicture failed", e);
+        }
+    }
+
+    private void processHighResImage(byte[] rawData, int width, int height) {
+        int rotation = getOrientation();
+        com.media.camera.preview.ai.SegmentationEngine engine = new com.media.camera.preview.ai.SegmentationEngine(mContext, 256, 1, null);
+        engine.generateMask(rawData, width, height, rotation, (maskData, maskW, maskH) -> {
+             mVideoRenderer.renderStillFrame(rawData, maskData, width, height, (processedData, outW, outH) -> {
+                  try {
+                    android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(outW, outH, android.graphics.Bitmap.Config.ARGB_8888);
+                    bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(processedData));
 
                     java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
                     bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, bos);
@@ -310,27 +326,11 @@ public class CameraController implements PreviewFrameHandler {
                         mStorageController.saveImage(jpegData, filename);
                     });
                 } catch (Exception e) {
-                    Log.e(TAG, "Error saving captured image", e);
+                    Log.e(TAG, "Error saving processed image", e);
                 }
-            });
+                engine.stop();
+             });
         });
-
-        /* Legacy Direct Capture - Bypassed to support rendering effects
-        try {
-            final CaptureRequest.Builder captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            captureBuilder.addTarget(mJpegImageReader.getSurface());
-
-            // Use the same AE and AF modes as the preview.
-            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation());
-
-            mCaptureSession.capture(captureBuilder.build(), new CameraCaptureSession.CaptureCallback() {
-                // Optional: Handle capture completed
-            }, mBackgroundHandler);
-        } catch (CameraAccessException e) {
-            Log.e(TAG, "takePicture failed", e);
-        }
-        */
     }
 
     /**

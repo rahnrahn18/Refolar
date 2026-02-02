@@ -33,6 +33,7 @@ public:
     void updateDepthData(uint8_t *data, size_t width, size_t height);
     void setQualityParams(int samples);
     void captureNextFrame(JNIEnv *env, jobject callback);
+    void renderStill(JNIEnv *env, jbyteArray yuv, jbyteArray mask, jint width, jint height, jobject callback);
 
     static void createContext(JNIEnv *env, jobject obj, jint type);
 

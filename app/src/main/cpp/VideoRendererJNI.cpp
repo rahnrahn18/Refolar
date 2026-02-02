@@ -93,3 +93,8 @@ JCMCPRV(void, captureNextFrame)(JNIEnv *env, jobject obj, jobject callback) {
 
     if (context) context->captureNextFrame(env, callback);
 }
+
+JCMCPRV(void, renderStill)(JNIEnv *env, jobject obj, jbyteArray yuv, jbyteArray mask, jint width, jint height, jobject callback) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+    if (context) context->renderStill(env, yuv, mask, width, height, callback);
+}

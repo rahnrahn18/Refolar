@@ -44,6 +44,7 @@ public abstract class VideoRenderer {
     protected native void updateDepthData(byte[] data, int width, int height);
     protected native void setQualityParams(int samples);
     protected native void captureNextFrame(CaptureCallback callback);
+    protected native void renderStill(byte[] yuv, byte[] mask, int width, int height, CaptureCallback callback);
 
     public interface CaptureCallback {
         void onCapture(byte[] data, int width, int height);
@@ -51,6 +52,10 @@ public abstract class VideoRenderer {
 
     public void captureFrame(CaptureCallback callback) {
         captureNextFrame(callback);
+    }
+
+    public void renderStillFrame(byte[] yuv, byte[] mask, int width, int height, CaptureCallback callback) {
+        renderStill(yuv, mask, width, height, callback);
     }
 
     public abstract void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror);

@@ -87,6 +87,53 @@ void VideoRendererContext::captureNextFrame(JNIEnv *env, jobject callback) {
     });
 }
 
+void VideoRendererContext::renderStill(JNIEnv *env, jbyteArray yuv, jbyteArray mask, jint width, jint height, jobject callback) {
+    if (!m_pVideoRenderer) return;
+
+    jobject callbackGlobal = env->NewGlobalRef(callback);
+
+    // Copy input buffers to native heap because JNI pointers become invalid after this call returns,
+    // and the renderer might execute async or need stable pointers.
+    // However, for this one-shot synchronous-like behavior (but executed on render thread/queue),
+    // it's safer to copy.
+    jbyte *yuvBytes = env->GetByteArrayElements(yuv, nullptr);
+    jbyte *maskBytes = mask ? env->GetByteArrayElements(mask, nullptr) : nullptr;
+
+    size_t yuvSize = env->GetArrayLength(yuv);
+    size_t maskSize = mask ? env->GetArrayLength(mask) : 0;
+
+    std::vector<uint8_t> yuvVec(yuvBytes, yuvBytes + yuvSize);
+    std::vector<uint8_t> maskVec;
+    if (maskBytes) maskVec.assign(maskBytes, maskBytes + maskSize);
+
+    env->ReleaseByteArrayElements(yuv, yuvBytes, 0);
+    if (maskBytes) env->ReleaseByteArrayElements(mask, maskBytes, 0);
+
+    JavaVM* jvm;
+    env->GetJavaVM(&jvm);
+
+    m_pVideoRenderer->renderStill(yuvVec.data(), maskVec.empty() ? nullptr : maskVec.data(), width, height, [jvm, callbackGlobal, yuvVec, maskVec](uint8_t* data, int w, int h) {
+        JNIEnv* env;
+        bool needsDetach = false;
+        int getEnvStat = jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+        if (getEnvStat == JNI_EDETACHED) {
+            if (jvm->AttachCurrentThread(&env, nullptr) != 0) return;
+            needsDetach = true;
+        }
+
+        jclass callbackClass = env->GetObjectClass(callbackGlobal);
+        jmethodID onCaptureMethod = env->GetMethodID(callbackClass, "onCapture", "([BII)V");
+        if (onCaptureMethod) {
+            jbyteArray byteArray = env->NewByteArray(w * h * 4);
+            env->SetByteArrayRegion(byteArray, 0, w * h * 4, (jbyte*)data);
+            env->CallVoidMethod(callbackGlobal, onCaptureMethod, byteArray, w, h);
+            env->DeleteLocalRef(byteArray);
+        }
+        env->DeleteGlobalRef(callbackGlobal);
+        if (needsDetach) jvm->DetachCurrentThread();
+    });
+}
+
 void VideoRendererContext::createContext(JNIEnv *env, jobject obj, jint type) {
     auto *context = new VideoRendererContext(type);
 

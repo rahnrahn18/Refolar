@@ -31,7 +31,7 @@ public class VideoCapture implements ImageReader.OnImageAvailableListener {
         }
     }
 
-    private static byte[] YUV_420_888_data(Image image) {
+    public static byte[] YUV_420_888_data(Image image) {
         final int imageWidth = image.getWidth();
         final int imageHeight = image.getHeight();
         final Image.Plane[] planes = image.getPlanes();

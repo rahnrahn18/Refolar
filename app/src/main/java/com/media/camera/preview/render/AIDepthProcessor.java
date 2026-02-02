@@ -124,7 +124,7 @@ public class AIDepthProcessor {
         if (isProcessing.compareAndSet(false, true)) {
             backgroundHandler.post(() -> {
                 try {
-                    runInference(yuvData, width, height, rotation);
+                    runInference(yuvData, width, height, rotation, this.callback);
                 } catch (Exception e) {
                     Log.e(TAG, "Inference error", e);
                     isProcessing.set(false);
@@ -135,7 +135,24 @@ public class AIDepthProcessor {
         }
     }
 
-    private void runInference(byte[] yuvData, int width, int height, int rotation) {
+    public void generateMask(byte[] yuvData, int width, int height, int rotation, DepthCallback oneShotCallback) {
+        backgroundHandler.post(() -> {
+            try {
+                // Force run inference for still capture
+                runInference(yuvData, width, height, rotation, oneShotCallback);
+            } catch (Exception e) {
+                Log.e(TAG, "Still inference error", e);
+                // Fallback to white mask
+                if (oneShotCallback != null) {
+                    byte[] mock = new byte[inputSize * inputSize];
+                    for(int i=0; i<mock.length; i++) mock[i] = (byte)255;
+                    oneShotCallback.onDepthMapReady(mock, inputSize, inputSize);
+                }
+            }
+        });
+    }
+
+    private void runInference(byte[] yuvData, int width, int height, int rotation, DepthCallback targetCallback) {
         if (tflite == null) {
             runMockInference();
             return;
@@ -176,14 +193,14 @@ public class AIDepthProcessor {
             int backRotation = (360 - rotation) % 360;
             byte[] finalMask = rotateMask(depthMap, inputSize, inputSize, backRotation);
 
-            if (callback != null) {
-                callback.onDepthMapReady(finalMask, inputSize, inputSize);
+            if (targetCallback != null) {
+                targetCallback.onDepthMapReady(finalMask, inputSize, inputSize);
             }
 
         } catch (Exception e) {
             Log.e(TAG, "Inference failed (using mock): " + e.getMessage());
             e.printStackTrace();
-            runMockInference();
+            runMockInference(targetCallback);
         }
     }
 
@@ -210,16 +227,20 @@ public class AIDepthProcessor {
         return output;
     }
 
-    private void runMockInference() {
+    private void runMockInference(DepthCallback targetCallback) {
         // Fallback: Return a completely white mask (Subject) to avoid static vignette artifacts.
         // If inference fails, it's better to have no blur than a misleading one.
         byte[] depthMap = new byte[inputSize * inputSize];
         for (int i = 0; i < inputSize * inputSize; i++) {
             depthMap[i] = (byte) 255; // All Sharp
         }
-        if (callback != null) {
-            callback.onDepthMapReady(depthMap, inputSize, inputSize);
+        if (targetCallback != null) {
+            targetCallback.onDepthMapReady(depthMap, inputSize, inputSize);
         }
+    }
+
+    private void runMockInference() {
+        runMockInference(this.callback);
     }
 
     private void convertYUVtoRGBResize(byte[] yuv, int srcWidth, int srcHeight, int[] outRgb, int dstWidth, int dstHeight, int rotation) {

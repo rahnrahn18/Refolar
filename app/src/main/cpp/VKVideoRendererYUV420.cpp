@@ -70,6 +70,168 @@ void VKVideoRendererYUV420::captureNextFrame(std::function<void(uint8_t*, int, i
     m_captureRequest = true;
 }
 
+void VKVideoRendererYUV420::renderStill(uint8_t* yuv, uint8_t* mask, int width, int height, std::function<void(uint8_t*, int, int)> callback) {
+    vkQueueWaitIdle(m_deviceInfo.queue);
+
+    // 1. Temporarily resize textures to high-res
+    m_frameWidth = width;
+    m_frameHeight = height;
+    m_pBuffer = yuv;
+
+    // Clean up existing preview textures
+    deleteTextures();
+    // Create new high-res textures
+    createTextures();
+    // Upload high-res YUV
+    updateTextures();
+
+    // 2. Upload high-res Mask (if provided) or Mock
+    if (mask && m_depthProvider) {
+        // Need to bypass standard update logic which relies on staging buffer matching texture size
+        // Force re-create depth texture to match still size?
+        // Actually, existing AIDepthProvider creates texture based on updateData size.
+        m_depthProvider->updateData(mask, 256, 256); // Mask is still 256x256, sampler scales it up
+        m_depthProvider->updateTexture();
+    }
+
+    // Update descriptors to point to new textures
+    updateDescriptorSet();
+
+    // 3. Create Offscreen Framebuffer
+    VkImage offscreenImage;
+    VkDeviceMemory offscreenMemory;
+    VkImageView offscreenView;
+    VkFramebuffer offscreenFramebuffer;
+
+    // Create Image
+    VkImageCreateInfo imageInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = m_swapchainInfo.displayFormat, // Use same format as display
+        .extent = {(uint32_t)width, (uint32_t)height, 1},
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+    };
+    vkCreateImage(m_deviceInfo.device, &imageInfo, nullptr, &offscreenImage);
+
+    VkMemoryRequirements memReqs;
+    vkGetImageMemoryRequirements(m_deviceInfo.device, offscreenImage, &memReqs);
+    VkMemoryAllocateInfo allocInfo = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = memReqs.size };
+    allocateMemoryTypeFromProperties(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocInfo.memoryTypeIndex);
+    vkAllocateMemory(m_deviceInfo.device, &allocInfo, nullptr, &offscreenMemory);
+    vkBindImageMemory(m_deviceInfo.device, offscreenImage, offscreenMemory, 0);
+
+    // Create View
+    VkImageViewCreateInfo viewInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = offscreenImage,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = m_swapchainInfo.displayFormat,
+        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}
+    };
+    vkCreateImageView(m_deviceInfo.device, &viewInfo, nullptr, &offscreenView);
+
+    // Create Framebuffer (Compatible with existing RenderPass)
+    VkImageView attachments[] = { offscreenView };
+    VkFramebufferCreateInfo fbInfo = {
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .renderPass = m_render.renderPass,
+        .attachmentCount = 1,
+        .pAttachments = attachments,
+        .width = (uint32_t)width,
+        .height = (uint32_t)height,
+        .layers = 1
+    };
+    vkCreateFramebuffer(m_deviceInfo.device, &fbInfo, nullptr, &offscreenFramebuffer);
+
+    // 4. Render
+    VkCommandBuffer cmd;
+    VkCommandBufferAllocateInfo cmdAlloc = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = m_render.cmdPool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1 };
+    vkAllocateCommandBuffers(m_deviceInfo.device, &cmdAlloc, &cmd);
+
+    VkCommandBufferBeginInfo beginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    // Transition Undefined -> Color Attachment
+    setImageLayout(cmd, offscreenImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    VkRenderPassBeginInfo passInfo = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = m_render.renderPass,
+        .framebuffer = offscreenFramebuffer,
+        .renderArea = { {0,0}, {(uint32_t)width, (uint32_t)height} },
+        .clearValueCount = 1,
+        .pClearValues = &clearColor
+    };
+    vkCmdBeginRenderPass(cmd, &passInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Dynamic Viewport/Scissor for High Res
+    VkViewport viewport = {0, 0, (float)width, (float)height, 0.0f, 1.0f};
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    VkRect2D scissor = {{0,0}, {(uint32_t)width, (uint32_t)height}};
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    // Draw
+     if (m_isPortrait) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gfxPipelineBokeh.pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gfxPipelineBokeh.layout, 0, 1, &m_gfxPipelineBokeh.descSet, 0, nullptr);
+    } else {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gfxPipeline.pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gfxPipeline.layout, 0, 1, &m_gfxPipeline.descSet, 0, nullptr);
+    }
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_buffers.vertexBuffer, &offset);
+    vkCmdBindIndexBuffer(cmd, m_buffers.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdDrawIndexed(cmd, m_indexCount, 1, 0, 0, 0);
+
+    vkCmdEndRenderPass(cmd);
+
+    // 5. Readback (similar to captureNextFrame)
+    size_t size = width * height * 4;
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
+
+    setImageLayout(cmd, offscreenImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+    VkBufferImageCopy region = {
+        .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+        .imageExtent = {(uint32_t)width, (uint32_t)height, 1}
+    };
+    vkCmdCopyImageToBuffer(cmd, offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &region);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1, .pCommandBuffers = &cmd };
+    vkQueueSubmit(m_deviceInfo.queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_deviceInfo.queue);
+
+    void* data;
+    vkMapMemory(m_deviceInfo.device, stagingMemory, 0, size, 0, &data);
+    if (callback) callback((uint8_t*)data, width, height);
+    vkUnmapMemory(m_deviceInfo.device, stagingMemory);
+
+    // 6. Cleanup
+    vkDestroyBuffer(m_deviceInfo.device, stagingBuffer, nullptr);
+    vkFreeMemory(m_deviceInfo.device, stagingMemory, nullptr);
+    vkDestroyFramebuffer(m_deviceInfo.device, offscreenFramebuffer, nullptr);
+    vkDestroyImageView(m_deviceInfo.device, offscreenView, nullptr);
+    vkDestroyImage(m_deviceInfo.device, offscreenImage, nullptr);
+    vkFreeMemory(m_deviceInfo.device, offscreenMemory, nullptr);
+    vkFreeCommandBuffers(m_deviceInfo.device, m_render.cmdPool, 1, &cmd);
+
+    // 7. Reset State for Preview
+    // Setting frame size to 0 ensures that next draw() call detects size mismatch vs swapchain and recreates textures/descriptors.
+    m_frameWidth = 0;
+    m_frameHeight = 0;
+}
+
 void VKVideoRendererYUV420::createRenderPipeline() {
     createRenderPass();
     createFrameBuffers(); // Create 2 frame buffers.
@@ -791,6 +953,18 @@ VkResult VKVideoRendererYUV420::createGraphicsPipeline(VulkanGfxPipelineInfo *pi
             .pScissors = &scissor,
     };
 
+    VkDynamicState dynamicStateEnables[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .dynamicStateCount = 2,
+            .pDynamicStates = dynamicStateEnables
+    };
+
     // Specify multisample info
     VkSampleMask sampleMask = ~0u;
     VkPipelineMultisampleStateCreateInfo multisampleInfo{
@@ -897,7 +1071,7 @@ VkResult VKVideoRendererYUV420::createGraphicsPipeline(VulkanGfxPipelineInfo *pi
             .pMultisampleState = &multisampleInfo,
             .pDepthStencilState = nullptr,
             .pColorBlendState = &colorBlendInfo,
-            .pDynamicState = &dynamicStateInfo,
+            .pDynamicState = &dynamicStateInfo, // Use dynamic state
             .layout = pipelineInfo->layout,
             .renderPass = m_render.renderPass,
             .subpass = 0,
@@ -1088,6 +1262,23 @@ void VKVideoRendererYUV420::createCommandPool() {
                 .pClearValues = &clearValues};
         vkCmdBeginRenderPass(m_render.cmdBuffer[bufferIndex], &renderPassBeginInfo,
                              VK_SUBPASS_CONTENTS_INLINE);
+
+        VkViewport viewport{
+            .x = 0,
+            .y = 0,
+            .width = (float) m_swapchainInfo.displaySize.width,
+            .height = (float) m_swapchainInfo.displaySize.height,
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f
+        };
+        vkCmdSetViewport(m_render.cmdBuffer[bufferIndex], 0, 1, &viewport);
+
+        VkRect2D scissor{
+            .offset = {0, 0},
+            .extent = m_swapchainInfo.displaySize
+        };
+        vkCmdSetScissor(m_render.cmdBuffer[bufferIndex], 0, 1, &scissor);
+
         // Bind what is necessary to the command buffer
         if (m_isPortrait) {
             vkCmdBindPipeline(m_render.cmdBuffer[bufferIndex],

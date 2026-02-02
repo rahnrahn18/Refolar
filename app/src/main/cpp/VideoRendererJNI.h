@@ -23,6 +23,7 @@ JCMCPRV(void, setFilter)(JNIEnv *env, jobject obj, jint filterId);
 JCMCPRV(void, updateDepthData)(JNIEnv *env, jobject obj, jbyteArray data, jint width, jint height);
 JCMCPRV(void, setQualityParams)(JNIEnv *env, jobject obj, jint samples);
 JCMCPRV(void, captureNextFrame)(JNIEnv *env, jobject obj, jobject callback);
+JCMCPRV(void, renderStill)(JNIEnv *env, jobject obj, jbyteArray yuv, jbyteArray mask, jint width, jint height, jobject callback);
 
 #ifdef __cplusplus
 }
