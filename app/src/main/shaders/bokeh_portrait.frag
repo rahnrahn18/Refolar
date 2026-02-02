@@ -84,8 +84,27 @@ void main() {
         // Correct aspect ratio would be ideal, but assuming square pixels/isotropic blur for now.
         // Aspect correction: offset.x *= aspect_ratio;
 
-        accColor += yuv2rgb(texcoord + offset);
-        totalWeight += 1.0;
+        vec2 sampleUV = texcoord + offset;
+        vec3 sampleColor = yuv2rgb(sampleUV);
+        float sampleMask = texture(depthTex, sampleUV).r;
+
+        // Depth-aware rejection:
+        // If we are in the background (mask < 0.5), we avoid accumulating sharp foreground pixels (mask > 0.8)
+        // to prevent "halo" artifacts where the person bleeds into the blurred background.
+        float weight = 1.0;
+        if (mask < 0.5 && sampleMask > 0.8) {
+            weight = 0.05; // Significant suppression
+        }
+
+        // Cinematic Bokeh Highlight Boost
+        // Boost bright spots to simulate aperture shapes
+        float luma = dot(sampleColor, vec3(0.299, 0.587, 0.114));
+        if (luma > 0.7) {
+            weight *= (1.0 + pow(luma, 4.0) * 2.0);
+        }
+
+        accColor += sampleColor * weight;
+        totalWeight += weight;
     }
 
     uFragColor = vec4(accColor / totalWeight, 1.0);
