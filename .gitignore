@@ -1,0 +1,14 @@
+*.iml
+.gradle
+/local.properties
+.idea
+.DS_Store
+CMakeFiles
+CMakeCache.txt
+/build
+/captures
+local.properties
+.externalNativeBuild
+.cdep
+cdep.sha256
+.cxx
