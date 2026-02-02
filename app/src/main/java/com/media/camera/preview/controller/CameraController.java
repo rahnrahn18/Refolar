@@ -137,7 +137,15 @@ public class CameraController implements PreviewFrameHandler {
         mImageReader.setOnImageAvailableListener(mVideoCapture, mBackgroundHandler);
 
         // Initialize JPEG ImageReader for high-quality capture
-        mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.JPEG, 1);
+        // Defensive allocation: fall back to safe formats if allocation fails
+        try {
+            mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.JPEG, 2);
+        } catch (Exception e) {
+             Log.w(TAG, "Failed to allocate JPEG reader, retrying with smaller buffer or format", e);
+             // Last resort fallback (though JPEG is standard)
+             mJpegImageReader = ImageReader.newInstance(mPreviewSize.getWidth(), mPreviewSize.getHeight(), ImageFormat.YUV_420_888, 2);
+        }
+
         mJpegImageReader.setOnImageAvailableListener(reader -> {
             // Placeholder for saving image
             // In a real app, save 'reader.acquireNextImage()' to a file
