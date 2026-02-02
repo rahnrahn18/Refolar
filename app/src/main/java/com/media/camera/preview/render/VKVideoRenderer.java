@@ -8,9 +8,16 @@ import android.view.SurfaceView;
 public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Callback {
 
     private final Context mContext;
+    private com.media.camera.preview.ai.SegmentationEngine mSegmentationEngine;
+    private QualityManager.QualityConfig mQualityConfig;
 
     public VKVideoRenderer(Context context) {
         mContext = context;
+        mQualityConfig = QualityManager.getQualityConfig(context);
+
+        mSegmentationEngine = new com.media.camera.preview.ai.SegmentationEngine(context, mQualityConfig.aiResolution, mQualityConfig.aiFpsDivisor, (depthData, width, height) -> {
+            updateDepth(depthData, width, height);
+        });
     }
 
     public void init(SurfaceView surface) {
@@ -29,14 +36,28 @@ public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Call
         setFilter(filterId);
     }
 
+    public void updateDepth(byte[] data, int width, int height) {
+        updateDepthData(data, width, height);
+    }
+
+    public void updateQuality(int samples) {
+        setQualityParams(samples);
+    }
+
     @Override
     public void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror) {
         draw(data, width, height, rotation, mirror);
+        if (mSegmentationEngine != null) {
+            mSegmentationEngine.processFrame(data, width, height, rotation);
+        }
     }
 
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         create(Type.VK_YUV420.getValue());
+        if (mQualityConfig != null) {
+            updateQuality(mQualityConfig.sampleCount);
+        }
     }
 
     @Override
@@ -46,5 +67,8 @@ public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Call
 
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+        if (mSegmentationEngine != null) {
+            mSegmentationEngine.stop();
+        }
     }
 }

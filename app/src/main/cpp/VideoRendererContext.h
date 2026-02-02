@@ -30,6 +30,8 @@ public:
     void setPortraitMode(bool enable);
     void setBlurStrength(float strength);
     void setFilter(int filterId);
+    void updateDepthData(uint8_t *data, size_t width, size_t height);
+    void setQualityParams(int samples);
 
     static void createContext(JNIEnv *env, jobject obj, jint type);
 

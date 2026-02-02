@@ -1,168 +1,180 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorBackground">
+    android:background="#000000">
 
     <SurfaceView
         android:id="@+id/preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Top Toolbar -->
+    <!-- Top Center Settings Container -->
     <LinearLayout
-        android:id="@+id/top_toolbar"
-        android:layout_width="match_parent"
+        android:id="@+id/settings_container"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_hex_translucent"
+        android:padding="8dp"
         android:orientation="horizontal"
-        android:padding="16dp"
-        android:background="@drawable/gradient_overlay"
-        app:layout_constraintTop_toTopOf="parent"
-        android:gravity="end">
+        android:gravity="center_vertical">
 
         <ImageButton
-            android:id="@+id/btn_settings"
+            android:id="@+id/btn_settings_toggle"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:tint="#FFFFFF" />
+
+        <LinearLayout
+            android:id="@+id/settings_expanded"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <!-- Resolution, Format, Silent icons here (placeholders) -->
+            <ImageButton android:layout_width="32dp" android:layout_height="32dp" android:src="@android:drawable/ic_menu_crop" android:tint="#FFFFFF" android:layout_marginStart="8dp"/>
+            <ImageButton android:layout_width="32dp" android:layout_height="32dp" android:src="@android:drawable/ic_menu_save" android:tint="#FFFFFF" android:layout_marginStart="8dp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Side Bar (Thumb Reach - Right Side) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="16dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <ImageButton
+            android:id="@+id/btn_flash"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:src="@drawable/ic_aperture"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="@android:color/white"
-            android:contentDescription="Settings" />
+            android:background="@drawable/bg_hex_translucent"
+            android:src="@android:drawable/ic_menu_camera"
+            android:tint="#FFFFFF"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:layout_marginBottom="16dp"/>
+
+        <ImageButton
+            android:id="@+id/btn_filter_toggle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_hex_translucent"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:tint="#FFFFFF"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:layout_marginBottom="16dp"/>
+
+        <ImageButton
+            android:id="@+id/btn_beauty_toggle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_hex_translucent"
+            android:src="@android:drawable/ic_menu_view"
+            android:tint="#FFFFFF"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:layout_marginBottom="16dp"/>
+
+        <ImageButton
+            android:id="@+id/btn_portrait_toggle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_hex_translucent"
+            android:src="@android:drawable/ic_menu_crop"
+            android:tint="#FFFFFF"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:layout_marginBottom="16dp"/>
     </LinearLayout>
+
+    <!-- Bottom Controls -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:paddingBottom="32dp"
+        android:paddingTop="16dp">
+
+        <ImageButton
+            android:id="@+id/btn_gallery"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_toStartOf="@id/btn_shutter"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:tint="#FFFFFF" />
+
+        <ImageButton
+            android:id="@+id/btn_shutter"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/bg_hex_translucent"
+            android:src="@android:drawable/ic_menu_camera"
+            android:tint="#FFFFFF"
+            android:scaleType="fitCenter"
+            android:padding="20dp"/>
+
+        <ImageButton
+            android:id="@+id/btn_switch_camera"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_toEndOf="@id/btn_shutter"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_rotate"
+            android:tint="#FFFFFF" />
+    </RelativeLayout>
 
     <!-- Filter List (Hidden by default) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/filter_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:visibility="gone"
-        android:background="@drawable/gradient_overlay"
-        android:paddingVertical="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/bottom_controls"/>
+        android:layout_above="@id/btn_shutter"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"/>
 
-    <!-- Bottom Controls Area -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/bottom_controls"
-        android:layout_width="match_parent"
+    <!-- Aperture Slider (Hidden by default) -->
+    <LinearLayout
+        android:id="@+id/aperture_control_layout"
+        android:layout_width="200dp"
         android:layout_height="wrap_content"
-        android:background="@drawable/gradient_overlay"
-        android:paddingBottom="32dp"
-        android:paddingTop="16dp"
-        app:layout_constraintBottom_toBottomOf="parent">
+        android:layout_centerHorizontal="true"
+        android:layout_above="@id/filter_list"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:background="@drawable/bg_hex_translucent"
+        android:padding="8dp">
 
-        <!-- Portrait Mode Controls (Slider) -->
-        <LinearLayout
-            android:id="@+id/aperture_control_layout"
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/aperture_value_text"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:visibility="gone"
-            android:paddingHorizontal="24dp"
-            android:layout_marginBottom="24dp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toTopOf="@+id/btn_shutter">
+            android:text="f/2.8"
+            android:textColor="#FFFFFF"
+            android:gravity="center"/>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="f/"
-                android:textColor="@android:color/white"
-                android:textStyle="bold" />
-
-            <com.google.android.material.slider.Slider
-                android:id="@+id/aperture_slider"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:valueFrom="0.0"
-                android:valueTo="10.0"
-                android:value="5.0"
-                app:thumbColor="@color/colorPrimary"
-                app:trackColorActive="@color/colorPrimary"
-                app:trackColorInactive="@color/colorControlNormal" />
-
-            <TextView
-                android:id="@+id/aperture_value_text"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="2.8"
-                android:textColor="@android:color/white"
-                android:gravity="end" />
-        </LinearLayout>
-
-        <!-- Gallery Button -->
-        <ImageButton
-            android:id="@+id/btn_gallery"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_gallery"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/btn_shutter"
-            app:layout_constraintTop_toTopOf="@+id/btn_shutter"
-            app:layout_constraintBottom_toBottomOf="@+id/btn_shutter" />
-
-        <!-- Shutter Button -->
-        <ImageButton
-            android:id="@+id/btn_shutter"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@drawable/ic_shutter"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:scaleType="fitCenter"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
-
-        <!-- Switch Camera Button -->
-        <ImageButton
-            android:id="@+id/btn_switch_camera"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_switch_camera"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:layout_constraintStart_toEndOf="@+id/btn_shutter"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/btn_shutter"
-            app:layout_constraintBottom_toBottomOf="@+id/btn_shutter" />
-
-        <!-- Portrait Toggle Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_portrait_toggle"
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:layout_width="wrap_content"
+        <com.google.android.material.slider.Slider
+            android:id="@+id/aperture_slider"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Portrait"
-            app:icon="@drawable/ic_aperture"
-            app:backgroundTint="@color/colorSurface"
-            android:textColor="@color/colorPrimary"
-            android:layout_marginBottom="24dp"
-            app:layout_constraintBottom_toTopOf="@+id/btn_gallery"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/btn_filter_toggle"
-            app:layout_constraintHorizontal_chainStyle="packed"
-            android:layout_marginEnd="8dp"/>
+            android:valueFrom="0.0"
+            android:valueTo="10.0"
+            android:value="5.0"/>
+    </LinearLayout>
 
-        <!-- Filter Toggle Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_filter_toggle"
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Filter"
-            app:icon="@drawable/ic_gallery"
-            app:backgroundTint="@color/colorSurface"
-            android:textColor="@color/colorPrimary"
-            android:layout_marginBottom="24dp"
-            app:layout_constraintBottom_toTopOf="@+id/btn_gallery"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/btn_portrait_toggle"
-            android:layout_marginStart="8dp"/>
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+</RelativeLayout>

@@ -43,6 +43,8 @@ public class VKActivity extends BaseActivity implements ActivityCompat.OnRequest
     private VKVideoRenderer mVideoRenderer;
     private boolean isPortraitMode = false;
     private boolean isFilterMode = false;
+    private boolean isBeautyMode = false;
+    private boolean isSettingsExpanded = false;
     private float aperture = 5.0f;
     private ErrorDialog mErrorDialog;
 
@@ -62,57 +64,58 @@ public class VKActivity extends BaseActivity implements ActivityCompat.OnRequest
     }
 
     private void setupUI() {
-        // Portrait Controls
-        MaterialButton btnPortrait = findViewById(R.id.btn_portrait_toggle);
-        MaterialButton btnFilter = findViewById(R.id.btn_filter_toggle);
+        ImageButton btnPortrait = findViewById(R.id.btn_portrait_toggle);
+        ImageButton btnFilter = findViewById(R.id.btn_filter_toggle);
+        ImageButton btnBeauty = findViewById(R.id.btn_beauty_toggle);
+
         LinearLayout layoutAperture = findViewById(R.id.aperture_control_layout);
         Slider sliderAperture = findViewById(R.id.aperture_slider);
         TextView textAperture = findViewById(R.id.aperture_value_text);
         RecyclerView filterList = findViewById(R.id.filter_list);
 
-        // Camera Controls
         ImageButton btnShutter = findViewById(R.id.btn_shutter);
         ImageButton btnSwitch = findViewById(R.id.btn_switch_camera);
         ImageButton btnGallery = findViewById(R.id.btn_gallery);
-        ImageButton btnSettings = findViewById(R.id.btn_settings);
 
-        // Portrait Toggle Logic
+        ImageButton btnSettingsToggle = findViewById(R.id.btn_settings_toggle);
+        LinearLayout settingsExpanded = findViewById(R.id.settings_expanded);
+
+        // Portrait
         btnPortrait.setOnClickListener(v -> {
             isPortraitMode = !isPortraitMode;
             mVideoRenderer.updatePortraitMode(isPortraitMode);
 
-            if (isPortraitMode) {
-                // Disable Filter Mode if active
-                if (isFilterMode) {
-                    btnFilter.performClick();
-                }
-                layoutAperture.setVisibility(View.VISIBLE);
-                btnPortrait.setBackgroundColor(getResources().getColor(R.color.colorPrimary, getTheme()));
-                btnPortrait.setTextColor(getResources().getColor(R.color.colorOnPrimary, getTheme()));
+            layoutAperture.setVisibility(isPortraitMode ? View.VISIBLE : View.GONE);
+            btnPortrait.setColorFilter(isPortraitMode ? 0xFFFFD700 : 0xFFFFFFFF); // Yellow if active
+        });
+
+        // Beauty Mode
+        btnBeauty.setOnClickListener(v -> {
+            isBeautyMode = !isBeautyMode;
+            // Assuming filterId 4 is Beauty (from previous step implementation)
+            // If Beauty is a toggle independent of other filters, we might need a dedicated method.
+            // For now, adhering to the "don't mix filters" rule, it acts as a filter.
+            if (isBeautyMode) {
+                mVideoRenderer.updateFilter(4);
+                btnBeauty.setColorFilter(0xFFFFD700);
             } else {
-                layoutAperture.setVisibility(View.GONE);
-                btnPortrait.setBackgroundColor(getResources().getColor(R.color.colorSurface, getTheme()));
-                btnPortrait.setTextColor(getResources().getColor(R.color.colorPrimary, getTheme()));
+                mVideoRenderer.updateFilter(0); // Back to normal
+                btnBeauty.setColorFilter(0xFFFFFFFF);
             }
         });
 
-        // Filter Toggle Logic
+        // Filter Toggle
         btnFilter.setOnClickListener(v -> {
             isFilterMode = !isFilterMode;
+            filterList.setVisibility(isFilterMode ? View.VISIBLE : View.GONE);
+            btnFilter.setColorFilter(isFilterMode ? 0xFFFFD700 : 0xFFFFFFFF);
+        });
 
-            if (isFilterMode) {
-                // Disable Portrait Mode if active
-                if (isPortraitMode) {
-                    btnPortrait.performClick();
-                }
-                filterList.setVisibility(View.VISIBLE);
-                btnFilter.setBackgroundColor(getResources().getColor(R.color.colorPrimary, getTheme()));
-                btnFilter.setTextColor(getResources().getColor(R.color.colorOnPrimary, getTheme()));
-            } else {
-                filterList.setVisibility(View.GONE);
-                btnFilter.setBackgroundColor(getResources().getColor(R.color.colorSurface, getTheme()));
-                btnFilter.setTextColor(getResources().getColor(R.color.colorPrimary, getTheme()));
-            }
+        // Settings Expansion
+        btnSettingsToggle.setOnClickListener(v -> {
+            isSettingsExpanded = !isSettingsExpanded;
+            settingsExpanded.setVisibility(isSettingsExpanded ? View.VISIBLE : View.GONE);
+            // Simple expansion animation logic could go here
         });
 
         // Setup Filter List
@@ -154,15 +157,17 @@ public class VKActivity extends BaseActivity implements ActivityCompat.OnRequest
 
         // Gallery Logic
         btnGallery.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setType("image/*");
-            startActivity(intent);
+            mCameraController.getStorageController().openGallery();
         });
 
-        // Settings (Resolution) Logic
-        btnSettings.setOnClickListener(v -> {
-            showResolutionDialog(mCameraController.getOutputSizes());
-        });
+        // Settings (Resolution) Logic - Mapped to first expanded item if needed,
+        // or effectively removed for now as btnSettings was removed.
+        // If we want to keep it accessible:
+        if (settingsExpanded.getChildCount() > 0) {
+            settingsExpanded.getChildAt(0).setOnClickListener(v -> {
+                showResolutionDialog(mCameraController.getOutputSizes());
+            });
+        }
     }
 
     @Override

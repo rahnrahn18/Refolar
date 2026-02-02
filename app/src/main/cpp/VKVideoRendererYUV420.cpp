@@ -2,6 +2,7 @@
 #include "VKUtils.h"
 #include "CommonUtils.h"
 #include "Log.h"
+#include "AIDepthProvider.h"
 
 #include <cassert>
 #include <vector>
@@ -49,6 +50,16 @@ void VKVideoRendererYUV420::setBlurStrength(float strength) {
     m_blurStrength = strength;
 }
 
+void VKVideoRendererYUV420::updateDepthData(uint8_t *data, size_t width, size_t height) {
+    if (m_depthProvider) {
+        m_depthProvider->updateData(data, width, height);
+    }
+}
+
+void VKVideoRendererYUV420::setQualityParams(int samples) {
+    m_sampleCount = samples;
+}
+
 void VKVideoRendererYUV420::createRenderPipeline() {
     createRenderPass();
     createFrameBuffers(); // Create 2 frame buffers.
@@ -81,6 +92,10 @@ void VKVideoRendererYUV420::init(ANativeWindow *window, AAssetManager *assetMana
     };
 
     createDevice(window, &appInfo);
+
+    m_depthProvider = std::make_unique<AIDepthProvider>();
+    m_depthProvider->init(m_deviceInfo.device, m_deviceInfo.queue, m_deviceInfo.memoryProperties, m_deviceInfo.queueFamilyIndex);
+
     createSwapChain();
 }
 
@@ -125,6 +140,13 @@ void VKVideoRendererYUV420::draw(uint8_t *buffer, size_t length, size_t width, s
     m_pBuffer = buffer;
     m_rotation = rotation;
     m_mirror = mirror;
+
+    // Update depth texture on render thread
+    if (m_depthProvider) {
+        if (m_depthProvider->updateTexture()) {
+            updateDescriptorSet();
+        }
+    }
 
     // Trigger full pipeline rebuild if size changes OR dirty flag (filters/portrait) is set
     if (isInitialized() && ((m_frameWidth != width || m_frameHeight != height) || isDirty)) {
@@ -244,6 +266,7 @@ int VKVideoRendererYUV420::createProgram(const char *pVertexSource, const char *
         case 1: filterShader = "shaders/filter_grey.frag.spv"; break;
         case 2: filterShader = "shaders/filter_sepia.frag.spv"; break;
         case 3: filterShader = "shaders/filter_invert.frag.spv"; break;
+        case 4: filterShader = "shaders/beauty_face.frag.spv"; break;
         default: filterShader = "shaders/video_frame.frag.spv"; break;
     }
 
@@ -568,7 +591,7 @@ void VKVideoRendererYUV420::setImageLayout(VkCommandBuffer cmdBuffer, VkImage im
 VkResult VKVideoRendererYUV420::createGraphicsPipeline(VulkanGfxPipelineInfo *pipelineInfo, const char *vertShaderName, const char *fragShaderName) {
     memset(pipelineInfo, 0, sizeof(VulkanGfxPipelineInfo));
 
-    const VkDescriptorSetLayoutBinding descriptorSetLayoutBinding[2]{
+    const VkDescriptorSetLayoutBinding descriptorSetLayoutBinding[3]{
             {
                     .binding = 0,
                     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -582,11 +605,18 @@ VkResult VKVideoRendererYUV420::createGraphicsPipeline(VulkanGfxPipelineInfo *pi
                     .descriptorCount = kTextureCount,
                     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
                     .pImmutableSamplers = nullptr
+            },
+            {
+                    .binding = 2,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorCount = 1,
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pImmutableSamplers = nullptr
             }};
     const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
-            .bindingCount = 2,
+            .bindingCount = 3,
             .pBindings = descriptorSetLayoutBinding,
     };
     CALL_VK(vkCreateDescriptorSetLayout(m_deviceInfo.device,
@@ -803,7 +833,14 @@ void VKVideoRendererYUV420::updateDescriptorSet() {
             texDsts[idx].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         }
 
-        VkWriteDescriptorSet writeDst[2]{
+        VulkanTexture* depthTex = m_depthProvider->getTexture();
+        VkDescriptorImageInfo depthDst = {
+                .sampler = depthTex->sampler,
+                .imageView = depthTex->view,
+                .imageLayout = depthTex->imageLayout
+        };
+
+        VkWriteDescriptorSet writeDst[3]{
                 {
                         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                         .pNext = nullptr,
@@ -827,9 +864,21 @@ void VKVideoRendererYUV420::updateDescriptorSet() {
                         .pImageInfo = texDsts,
                         .pBufferInfo = nullptr,
                         .pTexelBufferView = nullptr
+                },
+                {
+                        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                        .pNext = nullptr,
+                        .dstSet = info.descSet,
+                        .dstBinding = 2,
+                        .dstArrayElement = 0,
+                        .descriptorCount = 1,
+                        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        .pImageInfo = &depthDst,
+                        .pBufferInfo = nullptr,
+                        .pTexelBufferView = nullptr
                 }
         };
-        vkUpdateDescriptorSets(m_deviceInfo.device, 2, writeDst, 0, nullptr);
+        vkUpdateDescriptorSets(m_deviceInfo.device, 3, writeDst, 0, nullptr);
     };
     updateSet(m_gfxPipeline);
     updateSet(m_gfxPipelineBokeh);
@@ -838,7 +887,7 @@ void VKVideoRendererYUV420::updateDescriptorSet() {
 // initialize descriptor set
 void VKVideoRendererYUV420::createDescriptorSet() {
     auto createSet = [&](VulkanGfxPipelineInfo &info) {
-        const VkDescriptorPoolSize poolSizes[2]{
+        const VkDescriptorPoolSize poolSizes[3]{
                 {
                         .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                         .descriptorCount = 1
@@ -846,13 +895,17 @@ void VKVideoRendererYUV420::createDescriptorSet() {
                 {
                         .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                         .descriptorCount = kTextureCount
+                },
+                {
+                        .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        .descriptorCount = 1
                 }
         };
         const VkDescriptorPoolCreateInfo descriptor_pool = {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                 .pNext = nullptr,
                 .maxSets = 2,
-                .poolSizeCount = 2,
+                .poolSizeCount = 3,
                 .pPoolSizes = poolSizes,
         };
 
@@ -1014,6 +1067,7 @@ void VKVideoRendererYUV420::updateUniformBuffers() {
 
     m_ubo.blurStrength = m_blurStrength;
     m_ubo.isPortrait = m_isPortrait ? 1 : 0;
+    m_ubo.sampleCount = m_sampleCount;
 }
 
 void VKVideoRendererYUV420::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {

@@ -41,6 +41,8 @@ public:
     virtual void setPortraitMode(bool enable) {}
     virtual void setBlurStrength(float strength) {}
     virtual void setFilter(int filterId) {}
+    virtual void updateDepthData(uint8_t *data, size_t width, size_t height) {}
+    virtual void setQualityParams(int samples) {}
 
     virtual int createProgram(const char *pVertexSource, const char *pFragmentSource) = 0;
 

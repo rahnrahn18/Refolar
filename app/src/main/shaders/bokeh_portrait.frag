@@ -4,18 +4,20 @@
 #extension GL_ARB_shading_language_420pack : enable
 
 layout (binding = 1) uniform sampler2D tex[3]; // Y, U, V
-layout (location = 0) in vec2 texcoord;
-layout (location = 0) out vec4 uFragColor;
+layout (binding = 2) uniform sampler2D depthTex; // Depth / Mask Texture
 
-// Match the updated C++ struct
 layout (binding = 0) uniform UniformBufferObject
 {
     mat4 rotation;
     mat4 scale;
     float blurStrength;
     int isPortrait;
-    vec2 padding;
+    int sampleCount;
+    float padding;
 } ubo;
+
+layout (location = 0) in vec2 texcoord;
+layout (location = 0) out vec4 uFragColor;
 
 vec3 yuv2rgb(vec2 uv_coord) {
     float y = texture(tex[0], uv_coord).r;
@@ -27,6 +29,7 @@ vec3 yuv2rgb(vec2 uv_coord) {
     return clamp(vec3(r, g, b), 0.0, 1.0);
 }
 
+// Golden Angle = 2.39996323 radians (~137.5 degrees)
 const float GOLDEN_ANGLE = 2.39996323;
 
 void main() {
@@ -37,35 +40,49 @@ void main() {
         return;
     }
 
-    // Vignette-based depth simulation
-    // Center of screen (0.5, 0.5) is sharp. Edges are blurred.
-    float dist = distance(texcoord, vec2(0.5, 0.5));
-    float coc = smoothstep(0.15, 0.55, dist); // Start blurring at 0.15, max at 0.55
+    // Sample depth mask (AI Prediction or Hardware Depth)
+    // 1.0 = Subject (Sharp), 0.0 = Background (Blur)
+    float mask = texture(depthTex, texcoord).r;
 
-    float maxBlurRadius = ubo.blurStrength * 0.003; // Scale factor
+    // Calculate Circle of Confusion (CoC)
+    // Mimic lens characteristics: Objects far from focal plane (0.0 mask) have larger CoC.
+    float coc = clamp(1.0 - mask, 0.0, 1.0);
+
+    // Dynamic blur radius based on aperture (blurStrength) and CoC
+    // Adjusted coefficient for more pronounced but controlled blur
+    float maxBlurRadius = ubo.blurStrength * 0.005;
     float radius = coc * maxBlurRadius;
 
-    if (radius < 0.0005) {
+    // Optimization: If blur is negligible, return center color immediately
+    // Increased threshold slightly to avoid micro-blur on edges
+    if (radius < 0.0008) {
         uFragColor = vec4(centerColor, 1.0);
         return;
     }
 
+    // Accumulate samples for Cinematic Disk Blur (Bokeh)
+    // Uses Golden Angle Spiral distribution to avoid banding artifacts and simulate circular aperture.
+    // Inspired by "Circular DoF" techniques (though implemented as single-pass stochastic gather here).
+
     vec3 accColor = centerColor;
     float totalWeight = 1.0;
 
-    float angle = 0.0;
+    int samples = ubo.sampleCount;
+    // Clamp sample count to avoid GPU hangs or poor quality
+    if (samples < 4) samples = 4;
+    if (samples > 64) samples = 64;
 
-    // 16 samples for performance balance
-    for (int i = 1; i <= 16; i++) {
-        angle += GOLDEN_ANGLE;
-        float r = radius * sqrt(float(i) / 16.0);
-        vec2 offset = vec2(cos(angle), sin(angle)) * r;
+    for (int i = 1; i < 64; i++) {
+        if (i >= samples) break;
 
-        // Correct aspect ratio for circular bokeh (assuming landscape/portrait handling in matrix?)
-        // The texture coordinates are already transformed by ubo.scale/rotation in vertex shader.
-        // But here we are adding offset in UV space.
-        // Without knowing exact aspect ratio in frag shader, circles might look oval.
-        // We accept this for now.
+        float theta = float(i) * GOLDEN_ANGLE;
+        // Radius distribution: sqrt(i / N) ensures uniform area sampling of the disk
+        float r = sqrt(float(i) / float(samples)) * radius;
+
+        vec2 offset = vec2(cos(theta), sin(theta)) * r;
+
+        // Correct aspect ratio would be ideal, but assuming square pixels/isotropic blur for now.
+        // Aspect correction: offset.x *= aspect_ratio;
 
         accColor += yuv2rgb(texcoord + offset);
         totalWeight += 1.0;
