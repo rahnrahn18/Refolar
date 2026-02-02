@@ -154,9 +154,7 @@ public class VKActivity extends BaseActivity implements ActivityCompat.OnRequest
 
         // Gallery Logic
         btnGallery.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setType("image/*");
-            startActivity(intent);
+            mCameraController.getStorageController().openGallery();
         });
 
         // Settings (Resolution) Logic

@@ -8,14 +8,14 @@ import android.view.SurfaceView;
 public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Callback {
 
     private final Context mContext;
-    private AIDepthProcessor mDepthProcessor;
+    private com.media.camera.preview.ai.SegmentationEngine mSegmentationEngine;
     private QualityManager.QualityConfig mQualityConfig;
 
     public VKVideoRenderer(Context context) {
         mContext = context;
         mQualityConfig = QualityManager.getQualityConfig(context);
 
-        mDepthProcessor = new AIDepthProcessor(context, mQualityConfig.aiResolution, mQualityConfig.aiFpsDivisor, (depthData, width, height) -> {
+        mSegmentationEngine = new com.media.camera.preview.ai.SegmentationEngine(context, mQualityConfig.aiResolution, mQualityConfig.aiFpsDivisor, (depthData, width, height) -> {
             updateDepth(depthData, width, height);
         });
     }
@@ -47,8 +47,8 @@ public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Call
     @Override
     public void drawVideoFrame(byte[] data, int width, int height, int rotation, boolean mirror) {
         draw(data, width, height, rotation, mirror);
-        if (mDepthProcessor != null) {
-            mDepthProcessor.processFrame(data, width, height, rotation);
+        if (mSegmentationEngine != null) {
+            mSegmentationEngine.processFrame(data, width, height, rotation);
         }
     }
 
@@ -67,8 +67,8 @@ public class VKVideoRenderer extends VideoRenderer implements SurfaceHolder.Call
 
     @Override
     public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-        if (mDepthProcessor != null) {
-            mDepthProcessor.stop();
+        if (mSegmentationEngine != null) {
+            mSegmentationEngine.stop();
         }
     }
 }

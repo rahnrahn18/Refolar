@@ -28,6 +28,7 @@ import com.media.camera.preview.capture.PreviewFrameHandler;
 import com.media.camera.preview.capture.VideoCapture;
 import com.media.camera.preview.render.VideoRenderer;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,11 +66,17 @@ public class CameraController implements PreviewFrameHandler {
     private ImageReader mJpegImageReader;
     private int mWidth = 0;
     private int mHeight = 0;
+    private StorageController mStorageController;
 
     public CameraController(Context context, VideoRenderer videoRenderer) {
         mContext = context;
         mVideoRenderer = videoRenderer;
         mVideoCapture = new VideoCapture(this);
+        mStorageController = new StorageController(context);
+    }
+
+    public StorageController getStorageController() {
+        return mStorageController;
     }
 
     @Override
@@ -147,11 +154,19 @@ public class CameraController implements PreviewFrameHandler {
         }
 
         mJpegImageReader.setOnImageAvailableListener(reader -> {
-            // Placeholder for saving image
-            // In a real app, save 'reader.acquireNextImage()' to a file
-            // For now, we just close it to avoid blocking
             try (android.media.Image image = reader.acquireNextImage()) {
-                // TODO: Save image to disk
+                if (image != null) {
+                    ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                    byte[] bytes = new byte[buffer.remaining()];
+                    buffer.get(bytes);
+
+                    String filename = "IMG_" + System.currentTimeMillis();
+
+                    // Post to main thread for Toast visibility if needed, or handle in StorageController
+                    new Handler(mContext.getMainLooper()).post(() -> {
+                         mStorageController.saveImage(bytes, filename);
+                    });
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error processing JPEG", e);
             }
