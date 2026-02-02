@@ -20,6 +20,8 @@ JCMCPRV(jint, getParameters)(JNIEnv *env, jobject obj);
 JCMCPRV(void, setPortraitMode)(JNIEnv *env, jobject obj, jboolean enabled);
 JCMCPRV(void, setBlurStrength)(JNIEnv *env, jobject obj, jfloat strength);
 JCMCPRV(void, setFilter)(JNIEnv *env, jobject obj, jint filterId);
+JCMCPRV(void, updateDepthData)(JNIEnv *env, jobject obj, jbyteArray data, jint width, jint height);
+JCMCPRV(void, setQualityParams)(JNIEnv *env, jobject obj, jint samples);
 
 #ifdef __cplusplus
 }

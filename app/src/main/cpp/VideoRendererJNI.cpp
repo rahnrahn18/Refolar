@@ -72,3 +72,18 @@ JCMCPRV(void, setFilter)(JNIEnv *env, jobject obj, jint filterId) {
 
     if (context) context->setFilter(filterId);
 }
+
+JCMCPRV(void, updateDepthData)(JNIEnv *env, jobject obj, jbyteArray data, jint width, jint height) {
+    jbyte *bufferPtr = env->GetByteArrayElements(data, nullptr);
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->updateDepthData((uint8_t *) bufferPtr, (size_t) width, (size_t) height);
+
+    env->ReleaseByteArrayElements(data, bufferPtr, 0);
+}
+
+JCMCPRV(void, setQualityParams)(JNIEnv *env, jobject obj, jint samples) {
+    VideoRendererContext *context = VideoRendererContext::getContext(env, obj);
+
+    if (context) context->setQualityParams(samples);
+}

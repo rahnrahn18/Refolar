@@ -4,18 +4,20 @@
 #extension GL_ARB_shading_language_420pack : enable
 
 layout (binding = 1) uniform sampler2D tex[3]; // Y, U, V
-layout (location = 0) in vec2 texcoord;
-layout (location = 0) out vec4 uFragColor;
+layout (binding = 2) uniform sampler2D depthTex; // Depth / Mask Texture
 
-// Match the updated C++ struct
 layout (binding = 0) uniform UniformBufferObject
 {
     mat4 rotation;
     mat4 scale;
     float blurStrength;
     int isPortrait;
-    vec2 padding;
+    int sampleCount;
+    float padding;
 } ubo;
+
+layout (location = 0) in vec2 texcoord;
+layout (location = 0) out vec4 uFragColor;
 
 vec3 yuv2rgb(vec2 uv_coord) {
     float y = texture(tex[0], uv_coord).r;
@@ -37,14 +39,19 @@ void main() {
         return;
     }
 
-    // Vignette-based depth simulation
-    // Center of screen (0.5, 0.5) is sharp. Edges are blurred.
-    float dist = distance(texcoord, vec2(0.5, 0.5));
-    float coc = smoothstep(0.15, 0.55, dist); // Start blurring at 0.15, max at 0.55
+    // Sample depth mask.
+    // Assumes 1.0 = Subject (Sharp), 0.0 = Background (Blur)
+    float mask = texture(depthTex, texcoord).r;
 
-    float maxBlurRadius = ubo.blurStrength * 0.003; // Scale factor
+    // Invert mask for Circle of Confusion (CoC)
+    // 1.0 (Subject) -> 0.0 blur. 0.0 (Background) -> 1.0 blur.
+    float coc = clamp(1.0 - mask, 0.0, 1.0);
+
+    // Dynamic blur radius based on strength and CoC
+    float maxBlurRadius = ubo.blurStrength * 0.005;
     float radius = coc * maxBlurRadius;
 
+    // Optimization: If blur is negligible, return center color
     if (radius < 0.0005) {
         uFragColor = vec4(centerColor, 1.0);
         return;
@@ -53,19 +60,21 @@ void main() {
     vec3 accColor = centerColor;
     float totalWeight = 1.0;
 
-    float angle = 0.0;
+    int samples = ubo.sampleCount;
+    if (samples < 4) samples = 4;
+    if (samples > 64) samples = 64; // Hard cap for performance safety
 
-    // 16 samples for performance balance
-    for (int i = 1; i <= 16; i++) {
-        angle += GOLDEN_ANGLE;
-        float r = radius * sqrt(float(i) / 16.0);
-        vec2 offset = vec2(cos(angle), sin(angle)) * r;
+    for (int i = 1; i < 64; i++) {
+        if (i >= samples) break;
 
-        // Correct aspect ratio for circular bokeh (assuming landscape/portrait handling in matrix?)
-        // The texture coordinates are already transformed by ubo.scale/rotation in vertex shader.
-        // But here we are adding offset in UV space.
-        // Without knowing exact aspect ratio in frag shader, circles might look oval.
-        // We accept this for now.
+        float theta = float(i) * GOLDEN_ANGLE;
+        // Radius distribution: sqrt(i / N) ensures uniform area sampling
+        float r = sqrt(float(i) / float(samples)) * radius;
+
+        vec2 offset = vec2(cos(theta), sin(theta)) * r;
+
+        // Note: Ideally correct for aspect ratio here, but ignoring for simplicity
+        // as per previous implementation style.
 
         accColor += yuv2rgb(texcoord + offset);
         totalWeight += 1.0;

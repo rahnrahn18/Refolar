@@ -42,6 +42,14 @@ void VideoRendererContext::setFilter(int filterId) {
     m_pVideoRenderer->setFilter(filterId);
 }
 
+void VideoRendererContext::updateDepthData(uint8_t *data, size_t width, size_t height) {
+    m_pVideoRenderer->updateDepthData(data, width, height);
+}
+
+void VideoRendererContext::setQualityParams(int samples) {
+    m_pVideoRenderer->setQualityParams(samples);
+}
+
 void VideoRendererContext::createContext(JNIEnv *env, jobject obj, jint type) {
     auto *context = new VideoRendererContext(type);
 

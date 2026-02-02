@@ -4,6 +4,7 @@
 #define _VK_VIDEO_RENDERER_YUV_H_
 
 #include "VideoRenderer.h"
+#include "IDepthProvider.h"
 #include <vulkan/vulkan.h>
 
 class VKVideoRendererYUV420 : public VideoRenderer {
@@ -28,6 +29,8 @@ public:
     void setPortraitMode(bool enable) override;
     void setBlurStrength(float strength) override;
     void setFilter(int filterId) override;
+    void updateDepthData(uint8_t *data, size_t width, size_t height) override;
+    void setQualityParams(int samples) override;
 
 private:
     enum TextureType {
@@ -44,7 +47,8 @@ private:
         float scale[16];
         float blurStrength;
         int isPortrait;
-        float padding[2];
+        int sampleCount;
+        float padding;
     };
 
     UniformBufferObject m_ubo{};
@@ -52,18 +56,9 @@ private:
     bool m_isPortrait = false;
     float m_blurStrength = 5.0f;
     int m_filterId = 0; // 0: Normal, 1: Grey, 2: Sepia, 3: Invert
+    int m_sampleCount = 16;
 
-    struct VulkanTexture {
-        VkSampler sampler;
-        VkImage image;
-        __unused VkImageLayout imageLayout;
-        VkSubresourceLayout layout;
-        VkDeviceMemory mem;
-        VkImageView view;
-        size_t width;
-        size_t height;
-        void *mapped;
-    };
+    std::unique_ptr<IDepthProvider> m_depthProvider;
 
     struct VulkanDeviceInfo {
         VkInstance instance;

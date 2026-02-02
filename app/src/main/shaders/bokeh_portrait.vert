@@ -11,7 +11,8 @@ layout (binding = 0) uniform UniformBufferObject
     mat4 scale;
     float blurStrength;
     int isPortrait;
-    vec2 padding;
+    int sampleCount;
+    float padding;
 } ubo;
 layout (location = 0) out vec2 texcoord;
 
