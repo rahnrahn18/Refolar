@@ -409,6 +409,12 @@ void VKVideoRendererYUV420::draw(uint8_t *buffer, size_t length, size_t width, s
         }
     }
 
+    // Disable filters for Front Camera (Mirror) if requested to improve quality
+    if (m_mirror) {
+        m_filterId = 0; // Force Normal/No Filter
+        m_isPortrait = false; // Disable Portrait Mode on front camera if it causes issues
+    }
+
     // Trigger full pipeline rebuild if size changes OR dirty flag (filters/portrait) is set
     if (isInitialized() && ((m_frameWidth != width || m_frameHeight != height) || isDirty)) {
         m_frameWidth = width;
